@@ -75,9 +75,13 @@ def data_prepare(
     base = settings.resolve(settings.text2cadquery_dir)
     console.print("[bold]Preparing training splits[/bold]")
     summary = text2cadquery.prepare(base, sft_size=sft_size, grpo_size=grpo_size, seed=seed)
-    console.print(f"  matched pairs: {summary.total_pairs}")
-    console.print(f"  sft:  {summary.sft_count} → {summary.sft_path}")
-    console.print(f"  grpo: {summary.grpo_count} → {summary.grpo_path}")
+    console.print(f"  matched scripts: {summary.total_scripts}")
+    console.print(
+        f"  sft:  {summary.sft_scripts} scripts → {summary.sft_rows} rows → {summary.sft_path}"
+    )
+    console.print(
+        f"  grpo: {summary.grpo_scripts} scripts → {summary.grpo_rows} rows → {summary.grpo_path}"
+    )
 
 
 @bench_app.command("download")
@@ -98,17 +102,16 @@ def bench_run(
         help="Text2CAD-Bench release.csv",
     ),
     output_path: Path | None = typer.Option(None, "--output"),
-    style: str = typer.Option("geo", "--style", help="geo or pro"),
     limit: int | None = typer.Option(None, "--limit", min=1),
     max_tokens: int = typer.Option(512, "--max-tokens", min=16),
     verbose: bool = typer.Option(False, "--verbose", "-v"),
 ) -> None:
     """Run zero-shot eval on Text2CAD-Bench prompts."""
-    prompts = bench_data.load_prompts(prompts_path, style=style)
+    prompts = bench_data.load_prompts(prompts_path)
     if limit is not None:
         prompts = prompts[:limit]
 
-    console.print(f"[bold]Text2CAD-Bench[/bold] — {len(prompts)} prompts ({style})")
+    console.print(f"[bold]Text2CAD-Bench[/bold] — {len(prompts)} prompts")
     report = run_bench(prompts, max_tokens=max_tokens, verbose=verbose)
     destination = output_path or default_output_path()
     save_report(report, destination)

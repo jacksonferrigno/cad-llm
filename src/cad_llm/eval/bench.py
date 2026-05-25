@@ -17,7 +17,6 @@ from cad_llm.inference.generate import CadGenerator, GenerationResult
 class BenchResult:
     id: str
     prompt: str
-    style: str
     raw_response: str
     code: str
     execution: ExecutionResult
@@ -49,7 +48,6 @@ class BenchReport:
                 {
                     "id": r.id,
                     "prompt": r.prompt,
-                    "style": r.style,
                     "raw_response": r.raw_response,
                     "code": r.code,
                     "execution": asdict(r.execution),
@@ -98,7 +96,6 @@ def run_bench(
             BenchResult(
                 id=item.id,
                 prompt=item.prompt,
-                style=item.style,
                 raw_response=generation.raw_response,
                 code=generation.code,
                 execution=execution,

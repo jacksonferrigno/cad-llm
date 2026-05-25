@@ -7,7 +7,6 @@ def test_summarize_bench_results() -> None:
         BenchResult(
             id="L1_1",
             prompt="p",
-            style="geo",
             raw_response="r",
             code="c",
             execution=ExecutionResult(True, None, True, True, "cadquery"),
@@ -15,7 +14,6 @@ def test_summarize_bench_results() -> None:
         BenchResult(
             id="L1_2",
             prompt="p",
-            style="geo",
             raw_response="r",
             code="c",
             execution=ExecutionResult(False, "err", False, False, None),
