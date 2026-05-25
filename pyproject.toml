@@ -58,6 +58,9 @@ src = ["src", "tests", "scripts"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.per-file-ignores]
+"src/cad_llm/cli.py" = ["B008"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

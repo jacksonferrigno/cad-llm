@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     artifacts_dir: Path = Path("artifacts")
     models_dir: Path = Path("artifacts/models")
     checkpoints_dir: Path = Path("artifacts/checkpoints")
+    text2cadquery_dir: Path = Path("data/text2cadquery")
+    text2cad_bench_dir: Path = Path("data/text2cad_bench")
 
     mlx_model_id: str = "mlx-community/Qwen2.5-Coder-7B-Instruct-4bit"
     mlx_server_host: str = "127.0.0.1"

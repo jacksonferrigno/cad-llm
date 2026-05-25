@@ -42,12 +42,16 @@ cad-llm/
 ## Common commands
 
 ```bash
-make sync      # install / update dependencies
-make test      # run pytest
-make lint      # ruff check
-make fmt       # ruff fix + format
-make verify    # environment smoke test
-uv run cad-llm info
+make sync
+uv run cad-llm ensure-dirs
+
+# Training data
+uv run cad-llm data download
+uv run cad-llm data prepare
+
+# Benchmark (Text2CAD-Bench)
+uv run cad-llm bench download
+uv run cad-llm bench run
 ```
 
 ## Dependency groups
