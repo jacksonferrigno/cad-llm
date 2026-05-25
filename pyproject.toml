@@ -1,0 +1,69 @@
+[project]
+name = "cad-llm"
+version = "0.1.0"
+description = "Local CAD LLM — text to CadQuery on Apple Silicon"
+readme = "README.md"
+authors = [
+    { name = "jacksonferrigno", email = "jackferrigno@gmail.com" },
+]
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.0",
+    "pydantic>=2.10.0",
+    "pydantic-settings>=2.7.0",
+    "rich>=13.9.0",
+    "typer>=0.15.0",
+]
+
+[project.optional-dependencies]
+mlx = [
+    "mlx-lm>=0.31.0",
+    "mlx-tune>=0.4.25",
+]
+cad = [
+    "cadquery>=2.4.0",
+    "build123d>=0.8.0",
+    "numpy>=2.0.0",
+    "trimesh>=4.0.0",
+]
+web = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.34.0",
+]
+
+[project.scripts]
+cad-llm = "cad_llm.cli:app"
+
+[dependency-groups]
+dev = [
+    "cad-llm[cad,mlx,web]",
+    "mypy>=1.14.0",
+    "pytest>=8.3.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.9.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.9.6,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["cad_llm"]
+mypy_path = "src"

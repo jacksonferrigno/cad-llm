@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-local runtime data and model artifacts
+data/
+artifacts/
+
+# Generated geometry during eval
+*.step
+*.stp
+*.glb
+*.stl
+
+# macOS
+.DS_Store
