@@ -1,12 +1,12 @@
 # Local CAD LLM — Project Roadmap
 
 ## The pitch
-7B parameter model, fine-tuned entirely on a MacBook Pro (48GB), generates engineering CAD from plain English. No cloud, no API, no GPU rental.
+4B parameter model that generates engineering CAD from plain English. 
 
 ---
 
 ## Stack
-- **Model:** Qwen2.5-Coder-7B-Instruct (4-bit, ~5GB)
+- **Model:** [Qwen/Qwen3-4B](https://huggingface.co/Qwen/Qwen3-4B) (Vertex managed tuning: `qwen/qwen3@qwen3-4b`) → [mlx-community/Qwen3-4B-4bit](https://huggingface.co/mlx-community/Qwen3-4B-4bit) (local inference)
 - **Training:** mlx-tune (Apple MLX, LoRA → GRPO)
 - **Training data:** Text-to-CadQuery (~170k text + CadQuery pairs)
 - **CAD kernel:** CadQuery + build123d (Python, OpenCascade)
@@ -20,7 +20,7 @@
 
 ### Step 1 — Environment setup ✅
 - Install mlx-tune, CadQuery, build123d
-- Load Qwen2.5-Coder-7B-Instruct via mlx_lm
+- Load Qwen3-4B via mlx_lm
 - Verify inference works at usable speed on 48GB Mac
 
 ### Step 2 — Baseline (Text2CAD-Bench)

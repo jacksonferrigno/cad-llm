@@ -1,6 +1,6 @@
 # Local CAD LLM
 
-Fine-tune a 7B coder model on Apple Silicon to generate CadQuery/build123d from plain English — fully local, no cloud GPU.
+Fine-tune a 4B coder model on Apple Silicon to generate CadQuery/build123d from plain English — fully local, no cloud GPU.
 
 See [overview.md](overview.md) for the full roadmap.
 
@@ -58,11 +58,13 @@ uv run cad-llm bench run
 
 Core dependencies install with `uv sync`. Optional extras are wired into the `dev` group:
 
-| Extra | Packages | Purpose |
-|---|---|---|
-| `mlx` | mlx-lm, mlx-tune | inference & fine-tuning |
-| `cad` | cadquery, build123d, trimesh | geometry kernel |
-| `web` | fastapi, uvicorn | demo API (Step 8) |
+
+| Extra | Packages                     | Purpose                 |
+| ----- | ---------------------------- | ----------------------- |
+| `mlx` | mlx-lm, mlx-tune             | inference & fine-tuning |
+| `cad` | cadquery, build123d, trimesh | geometry kernel         |
+| `web` | fastapi, uvicorn             | demo API (Step 8)       |
+
 
 Install a subset without dev tools:
 

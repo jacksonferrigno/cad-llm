@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from cad_llm.data.text2cadquery import _uid_from_zip_path, prepare
+from cad_llm.inference.generate import SYSTEM_PROMPT
 
 
 @pytest.fixture
@@ -76,13 +77,27 @@ def test_uid_from_zip_path() -> None:
 
 
 def test_prepare_uses_all_captions(sample_raw: Path) -> None:
-    summary = prepare(sample_raw, sft_size=1, grpo_size=2, seed=42)
+    summary = prepare(sample_raw, sft_size=2, grpo_size=1, seed=42, val_ratio=0.5)
     assert summary.total_scripts == 3
     assert summary.sft_scripts == 1
-    assert summary.grpo_scripts == 2
+    assert summary.sft_val_scripts == 1
+    assert summary.grpo_scripts == 1
     assert summary.sft_rows == 4
-    assert summary.grpo_rows == 8
+    assert summary.sft_val_rows == 4
+    assert summary.grpo_rows == 4
+    assert summary.sft_val_path.name == "sft_val.jsonl"
 
     sft_lines = summary.sft_path.read_text().strip().splitlines()
     row = json.loads(sft_lines[0])
-    assert set(row.keys()) == {"prompt", "completion"}
+    assert set(row.keys()) == {"messages"}
+    assert row["messages"][0] == {"role": "system", "content": SYSTEM_PROMPT}
+    assert row["messages"][1]["role"] == "user"
+    assert row["messages"][2]["role"] == "assistant"
+
+    val_lines = summary.sft_val_path.read_text().strip().splitlines()
+    assert len(val_lines) == 4
+    val_row = json.loads(val_lines[0])
+    assert val_row["messages"][0]["content"] == SYSTEM_PROMPT
+
+    grpo_row = json.loads(summary.grpo_path.read_text().strip().splitlines()[0])
+    assert set(grpo_row.keys()) == {"prompt", "completion"}

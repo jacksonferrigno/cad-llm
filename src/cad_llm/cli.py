@@ -9,6 +9,7 @@ from cad_llm.config import settings
 from cad_llm.data import bench as bench_data
 from cad_llm.data import text2cadquery
 from cad_llm.eval.bench import default_output_path, run_bench, save_report
+from cad_llm.training.sft import DEFAULT_DATA, DEFAULT_OUTPUT, run_sft
 
 app = typer.Typer(
     name="cad-llm",
@@ -19,8 +20,10 @@ console = Console()
 
 data_app = typer.Typer(help="Download and prepare training data.")
 bench_app = typer.Typer(help="Text2CAD-Bench evaluation.")
+train_app = typer.Typer(help="Model training.")
 app.add_typer(data_app, name="data")
 app.add_typer(bench_app, name="bench")
+app.add_typer(train_app, name="train")
 
 DEFAULT_BENCH_PROMPTS = bench_data.default_prompts_path(
     settings.resolve(settings.text2cad_bench_dir)
@@ -34,7 +37,9 @@ def info() -> None:
     console.print(f"  project root:  {settings.project_root}")
     console.print(f"  data dir:      {settings.resolve(settings.data_dir)}")
     console.print(f"  artifacts dir: {settings.resolve(settings.artifacts_dir)}")
-    console.print(f"  model id:      {settings.mlx_model_id}")
+    console.print(f"  vertex model:  {settings.vertex_base_model}")
+    console.print(f"  hf model:      {settings.hf_model_id}")
+    console.print(f"  mlx model:     {settings.mlx_model_id}")
 
 
 @app.command()
@@ -77,7 +82,10 @@ def data_prepare(
     summary = text2cadquery.prepare(base, sft_size=sft_size, grpo_size=grpo_size, seed=seed)
     console.print(f"  matched scripts: {summary.total_scripts}")
     console.print(
-        f"  sft:  {summary.sft_scripts} scripts → {summary.sft_rows} rows → {summary.sft_path}"
+        f"  sft train: {summary.sft_scripts} scripts → {summary.sft_rows} rows → {summary.sft_path}"
+    )
+    console.print(
+        f"  sft val:   {summary.sft_val_scripts} scripts → {summary.sft_val_rows} rows → {summary.sft_val_path}"
     )
     console.print(
         f"  grpo: {summary.grpo_scripts} scripts → {summary.grpo_rows} rows → {summary.grpo_path}"
@@ -142,6 +150,23 @@ def bench_summarize(report_path: Path) -> None:
     table.add_row("Geometry rate", f"{summary['geometry_rate']:.1%}")
     table.add_row("Watertight rate", f"{summary['watertight_rate']:.1%}")
     console.print(table)
+
+
+@train_app.command("sft")
+def train_sft(
+    data_path: Path = typer.Option(DEFAULT_DATA, "--data"),
+    output_dir: Path = typer.Option(DEFAULT_OUTPUT, "--output"),
+    max_samples: int | None = typer.Option(None, "--max-samples", min=1),
+) -> None:
+    """LoRA SFT warm-up on prepared JSONL."""
+    console.print("[bold]SFT training[/bold]")
+    console.print(f"  data:   {data_path}")
+    console.print(f"  output: {output_dir}")
+    if max_samples:
+        console.print(f"  limit:  {max_samples} samples")
+
+    adapter_path = run_sft(data_path, output_dir, max_samples=max_samples)
+    console.print(f"\n[green]Done.[/green] Adapters saved to [cyan]{adapter_path}[/cyan]")
 
 
 def main() -> None:
