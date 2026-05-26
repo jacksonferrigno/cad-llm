@@ -59,7 +59,7 @@ def bootstrap_system_prompt(
                 collection_name=settings.docs_collection_name,
                 embedding_model=settings.docs_embedding_model,
                 chunks_cache=settings.resolve(settings.docs_chunks_cache),
-                limit=3,
+                limit=1,
             )
             append_event(
                 chat.transcript_path,

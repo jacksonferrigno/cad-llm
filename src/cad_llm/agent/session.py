@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from cad_llm.agent.orchestrator import run_orchestrated_agent
-from cad_llm.agent.runner import AgentRunResult, GenerateFn
+from cad_llm.agent.runner import AgentRunResult, GenerateFn, run_agent
 from cad_llm.inference.generate import CadGenerator
 from cad_llm.tools.workspace.project import ChatLayout, ProjectLayout
 
@@ -51,7 +50,7 @@ class AgentSession:
     ) -> AgentRunResult:
         self._turn_count += 1
 
-        return run_orchestrated_agent(
+        return run_agent(
             self.project,
             self.chat,
             prompt,

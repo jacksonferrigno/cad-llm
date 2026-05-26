@@ -29,7 +29,7 @@ def format_assistant_reply(text: str, *, max_chars: int = 480) -> str:
 
 def format_step(step: AgentStep) -> tuple[str, str]:
     """Return (tag, line) for the transcript pane. tag drives color."""
-    prefix = f"{step.phase} › " if step.phase and step.phase != "orchestrator" else ""
+    prefix = f"{step.phase} › " if step.phase else ""
 
     if step.kind == "phase":
         return "setup", f"setup  {step.content}"

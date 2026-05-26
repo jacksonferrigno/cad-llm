@@ -60,9 +60,6 @@ def test_reasoning_stream_incremental() -> None:
 
 
 def test_extract_strips_leading_thinking_close() -> None:
-    text = (
-        "</think>\n\n"
-        'import cadquery as cq\nresult = cq.Workplane("XY").box(1, 1, 1)'
-    )
+    text = '</think>\n\nimport cadquery as cq\nresult = cq.Workplane("XY").box(1, 1, 1)'
     code = extract_python_code(text)
     assert code.startswith("import cadquery")

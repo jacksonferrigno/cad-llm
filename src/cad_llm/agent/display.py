@@ -12,7 +12,9 @@ from cad_llm.inference.extract import ReasoningStream, extract_reasoning_text, s
 class AgentConsole:
     """Compact tool output with optional dim reasoning stream."""
 
-    def __init__(self, console: Console, *, stream: bool = True, show_reasoning: bool = False) -> None:
+    def __init__(
+        self, console: Console, *, stream: bool = True, show_reasoning: bool = False
+    ) -> None:
         self.console = console
         self.stream = stream
         self.show_reasoning = show_reasoning

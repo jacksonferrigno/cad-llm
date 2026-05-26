@@ -58,7 +58,9 @@ def run_python(
 
 
 class RunPythonInput(BaseModel):
-    project_root: str = Field(description="Absolute or relative path to the project root directory.")
+    project_root: str = Field(
+        description="Absolute or relative path to the project root directory."
+    )
     entrypoint: str = Field(
         default="src/main.py",
         description="Path to the Python file to run, relative to project_root unless already absolute.",

@@ -7,7 +7,7 @@ from cad_llm.agent.parse import parse_tool_calls
 
 def test_parse_single_tool_call() -> None:
     text = (
-        'Some preamble\n<tool_call>\n'
+        "Some preamble\n<tool_call>\n"
         '{"name": "load_skill", "arguments": {"name": "cad-generation"}}\n'
         "</tool_call>"
     )

@@ -34,6 +34,7 @@ from cad_llm.app.theme import (
     TEXT,
     USER,
 )
+from cad_llm.app.phase_block import PhaseBlock
 from cad_llm.app.viewer import CadViewerPanel
 from cad_llm.config import settings
 from cad_llm.inference.generate import CadGenerator
@@ -95,6 +96,9 @@ class CadDesktopApp(ctk.CTk):
         self._preloaded: CadGenerator | None = None
         self._busy = False
         self._events: queue.Queue[tuple[str, Any]] = queue.Queue()
+        self._active_phase: PhaseBlock | None = None
+        self._phase_seq = 0
+        self._last_assistant_in_phase: str | None = None
 
         self._build_layout()
         self._refresh_projects()
@@ -137,9 +141,7 @@ class CadDesktopApp(ctk.CTk):
             anchor="w",
         ).pack(fill="x", padx=18, pady=(8, 4))
 
-        self._project_list = ctk.CTkScrollableFrame(
-            sidebar, fg_color=SIDEBAR, corner_radius=0
-        )
+        self._project_list = ctk.CTkScrollableFrame(sidebar, fg_color=SIDEBAR, corner_radius=0)
         self._project_list.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
         ctk.CTkButton(
@@ -155,9 +157,7 @@ class CadDesktopApp(ctk.CTk):
         ).pack(fill="x", padx=10, pady=(0, 14))
 
         # Vertical divider
-        ctk.CTkFrame(root, width=1, fg_color=DIVIDER, corner_radius=0).pack(
-            side="left", fill="y"
-        )
+        ctk.CTkFrame(root, width=1, fg_color=DIVIDER, corner_radius=0).pack(side="left", fill="y")
 
         # Center: terminal
         center = ctk.CTkFrame(root, fg_color=BG, corner_radius=0)
@@ -231,9 +231,7 @@ class CadDesktopApp(ctk.CTk):
         self._send_btn.pack(side="right", padx=8, pady=8)
 
         # Vertical divider before viewer
-        ctk.CTkFrame(root, width=1, fg_color=DIVIDER, corner_radius=0).pack(
-            side="right", fill="y"
-        )
+        ctk.CTkFrame(root, width=1, fg_color=DIVIDER, corner_radius=0).pack(side="right", fill="y")
 
         # Right: CAD viewer
         self._viewer = CadViewerPanel(root)
@@ -364,21 +362,104 @@ class CadDesktopApp(ctk.CTk):
             elif kind == "model_error":
                 self._transcript.append_line(f"Model load failed: {payload}", "error")
             elif kind == "step":
-                step = payload
-                if step.kind == "assistant":
-                    text = format_assistant_reply(step.content)
-                    if text:
-                        self._transcript.append_line(f"agent › {text}", "done")
-                else:
-                    tag, line = format_step(step)
-                    self._transcript.append_line(line, tag)
+                self._handle_step(payload)
             elif kind == "mesh":
                 self._viewer.show_mesh_path(payload)
             elif kind == "error":
+                self._close_active_phase()
                 self._transcript.append_line(f"error  {payload}", "error")
             elif kind == "idle":
+                self._close_active_phase()
                 self._set_busy(False)
         self.after(100, self._poll_events)
+
+    # ── phase / step routing ────────────────────────────────────────────────
+
+    def _handle_step(self, step: AgentStep) -> None:
+        if step.kind == "phase":
+            self._close_active_phase()
+            self._open_phase(step.content)
+            return
+
+        if self._active_phase is None:
+            if step.kind == "assistant":
+                text = format_assistant_reply(step.content)
+                if text:
+                    self._transcript.append_line(f"agent › {text}", "done")
+                return
+            tag, line = format_step(step)
+            if line:
+                self._transcript.append_line(line, tag)
+            return
+
+        tag, line = format_step(step)
+        is_error = tag == "error"
+        if step.kind == "assistant":
+            text = format_assistant_reply(step.content)
+            if text:
+                self._last_assistant_in_phase = text
+            return
+        self._active_phase.record_step(is_error=is_error)
+        if line:
+            self._append_detail_line(line, tag)
+
+    def _open_phase(self, phase: str) -> None:
+        self._phase_seq += 1
+        block = PhaseBlock(
+            self._transcript,
+            phase=phase,
+            on_toggle=self._toggle_phase,
+        )
+        block._detail_tag = f"phase_detail_{self._phase_seq}"  # type: ignore[attr-defined]
+        inner = self._transcript._textbox
+        inner.configure(state="normal")
+        inner.tag_configure(
+            block._detail_tag,
+            elide=True,
+            lmargin1=24,
+            lmargin2=24,
+            spacing1=0,
+            spacing3=0,
+        )
+        if inner.compare("end-1c", ">", "1.0") and inner.get("end-2c", "end-1c") != "\n":
+            inner.insert("end", "\n")
+        inner.window_create("end", window=block, padx=4, pady=2)
+        inner.see("end")
+        inner.configure(state="disabled")
+        self._active_phase = block
+        self._last_assistant_in_phase = None
+
+    def _append_detail_line(self, text: str, tag: str) -> None:
+        if self._active_phase is None:
+            return
+        detail_tag = self._active_phase._detail_tag  # type: ignore[attr-defined]
+        inner = self._transcript._textbox
+        inner.configure(state="normal")
+        inner.insert("end", f"{text}\n", (detail_tag, tag))
+        inner.configure(state="disabled")
+
+    def _close_active_phase(self) -> None:
+        block = self._active_phase
+        if block is None:
+            return
+        block.finish()
+        phase = block.phase
+        reveal = self._last_assistant_in_phase if phase in {"implement", "chat"} else None
+        self._active_phase = None
+        self._last_assistant_in_phase = None
+        if reveal:
+            inner = self._transcript._textbox
+            inner.configure(state="normal")
+            inner.insert("end", f"agent › {reveal}\n", "done")
+            inner.see("end")
+            inner.configure(state="disabled")
+
+    def _toggle_phase(self, block: PhaseBlock) -> None:
+        inner = self._transcript._textbox
+        detail_tag = block._detail_tag  # type: ignore[attr-defined]
+        current = inner.tag_cget(detail_tag, "elide")
+        hidden = str(current).lower() in {"1", "true"}
+        inner.tag_configure(detail_tag, elide=not hidden)
 
 
 def run() -> None:

@@ -90,6 +90,7 @@ def _validate_python(content: str, *, path: str) -> str | None:
         ast.parse(content)
     except SyntaxError as exc:
         return f"error: Python syntax error in {path}: {exc.msg} (line {exc.lineno})"
+
     return None
 
 
@@ -112,9 +113,15 @@ def search_replace(project_root: Path, path: str, old: str, new: str) -> str:
     text = resolved.read_text(encoding="utf-8")
     if old not in text:
         return "no_match"
+    if old == new:
+        return "no_change"
     updated = text.replace(old, new)
+    if updated == text:
+        return "no_change"
     if path.endswith(".py"):
         updated = _sanitize_python_content(updated)
+        if updated == text:
+            return "no_change"
     syntax_error = _validate_python(updated, path=path)
     if syntax_error is not None:
         return syntax_error

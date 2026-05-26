@@ -50,6 +50,13 @@ def test_search_replace(project_root: Path) -> None:
     assert search_replace(project_root, "edit.txt", "missing", "x") == "no_match"
 
 
+def test_search_replace_rejects_noop(project_root: Path) -> None:
+    write_file(project_root, "edit.txt", "edges(\"|Z\")\n")
+
+    assert search_replace(project_root, "edit.txt", 'edges("|Z")', 'edges("|Z")') == "no_change"
+    assert read_file(project_root, "edit.txt") == 'edges("|Z")\n'
+
+
 def test_grep_file_and_project(project_root: Path) -> None:
     write_file(project_root, "src/x.py", "import cadquery\n# TODO\n")
     write_file(project_root, "src/y.py", "print('cadquery')\n")
@@ -79,14 +86,14 @@ def test_write_file_rejects_invalid_python(project_root: Path) -> None:
 
 def test_write_file_fixes_stray_single_space_indent(project_root: Path) -> None:
     content = (
-        'import cadquery as cq\n\n'
+        "import cadquery as cq\n\n"
         'result = cq.Workplane("XY").box(10, 10, 10)\n\n'
         ' cq.exporters.export(result, "outputs/cube.step")\n'
     )
     rel = write_file(project_root, "src/main.py", content)
     assert rel == "src/main.py"
     saved = (project_root / "src" / "main.py").read_text()
-    assert ' cq.exporters.export' not in saved
+    assert " cq.exporters.export" not in saved
     assert 'cq.exporters.export(result, "outputs/cube.step")' in saved
 
 
@@ -105,8 +112,8 @@ result = cq.Workplane("XY").box(1, 1, 1)
 def test_write_file_strips_show_calls(project_root: Path) -> None:
     content = (
         "import cadquery as cq\n\n"
-        "result = cq.Workplane(\"XY\").box(1, 1, 1)\n"
-        "cq.exporters.export(result, \"outputs/x.step\")\n"
+        'result = cq.Workplane("XY").box(1, 1, 1)\n'
+        'cq.exporters.export(result, "outputs/x.step")\n'
         "cq.show(result)\n"
         "cq.Viewer().show(result)\n"
     )

@@ -50,9 +50,7 @@ class CadViewerPanel(ctk.CTkFrame):
         )
         self._filename.pack(side="right", fill="x", expand=True, pady=10)
 
-        ctk.CTkFrame(self, height=1, fg_color=theme.DIVIDER, corner_radius=0).pack(
-            fill="x"
-        )
+        ctk.CTkFrame(self, height=1, fg_color=theme.DIVIDER, corner_radius=0).pack(fill="x")
 
         card = ctk.CTkFrame(
             self,

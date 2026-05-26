@@ -53,7 +53,9 @@ def chat_layout(project: ProjectLayout, chat_id: str) -> ChatLayout:
     )
 
 
-def create_project(projects_root: Path, *, name: str, project_id: str | None = None) -> ProjectLayout:
+def create_project(
+    projects_root: Path, *, name: str, project_id: str | None = None
+) -> ProjectLayout:
     pid = project_id or uuid.uuid4().hex[:12]
     layout = project_layout(projects_root, pid)
     layout.meta_dir.mkdir(parents=True, exist_ok=True)

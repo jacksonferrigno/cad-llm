@@ -4,9 +4,9 @@ A local agent that turns plain-English CAD requests into runnable CadQuery proje
 
 ## Model
 
-The agent uses a 4-billion-parameter Qwen3 coder model fine-tuned for CAD generation. Inference runs through MLX on Apple Silicon. The model loads once per session and stays in memory for follow-up prompts.
+The agent uses a 4-billion-parameter Qwen3.5 model for CAD generation. Inference runs locally on Apple Silicon. The model loads once per session and stays in memory for follow-up prompts.
 
-Default model path: `artifacts/models/` or `mlx-community/Qwen3-4B-4bit`.
+Default model path: `Qwen/Qwen3.5-4B`.
 
 ## What it does
 
@@ -16,46 +16,21 @@ For vague or brainstorming prompts, the agent replies with options and questions
 
 ## Architecture
 
-Three layers:
+Single agent with a tool-calling loop:
 
 ```
-Orchestrator
-    ├── Research subagent
-    └── Implementation subagent
+User prompt
+    ↓
+Bootstrap (skills + doc snippets)
+    ↓
+Agent loop: write → sandbox → fix → review → export
 ```
 
-### Orchestrator
-
-Routes each user message. Build requests go through research then implementation. Brainstorm requests get a text-only reply with no tools.
-
-### Research subagent
-
-Runs first on build requests. Its only job is documentation.
-
-1. Loads CadQuery doc snippets seeded from the user prompt.
-2. Calls `search_cadquery_docs` when more symbols are needed.
-3. Produces a Research Brief with three sections:
-   - Requirements
-   - CadQuery APIs copied from documentation
-   - Implementation plan
-
-The research agent does not write code or run the sandbox.
-
-### Implementation subagent
-
-Runs second. It receives the user request and the Research Brief.
-
-1. Writes `src/main.py` via `write_file`.
-2. Sandbox runs automatically after every source edit.
-3. On sandbox failure, reads the traceback and patches the code.
-4. On sandbox success, verifies the file against the brief and request.
-5. Exports geometry to `outputs/`.
-
-The implementation agent cannot finish until source is written and the sandbox passes.
+The agent loads `cad-generation` and `brainstorming` skills plus CadQuery doc snippets on the first turn. For build requests it writes `src/main.py`, runs the sandbox automatically after edits, fixes failures, and verifies the result before finishing. For vague prompts it replies in plain text without tools.
 
 ## Self-correction loop
 
-Each subagent runs a tool-calling loop up to 15 steps per turn.
+The agent runs up to 15 steps per turn:
 
 ```
 generate → tool call → observe result → generate again
@@ -63,23 +38,23 @@ generate → tool call → observe result → generate again
 
 Gates enforce progress:
 
-- Implementation cannot reply with prose until `write_file` has run.
-- Implementation cannot finish until sandbox returns `exit_code=0`.
+- Cannot finish until sandbox returns `exit_code=0` after the last src edit.
 - Syntax errors on write trigger an immediate rewrite nudge.
+- No-op patches trigger a nudge to make a material change.
 
 When sandbox fails, the error goes back into the conversation. The model edits and retries until the script runs or steps are exhausted.
 
 ## Tools
 
-| Tool | Used by | Purpose |
-|------|---------|---------|
-| `search_cadquery_docs` | Research | Hybrid vector + keyword search over indexed CadQuery HTML docs |
-| `write_file` | Implement | Create or overwrite project files |
-| `search_replace` | Implement | Patch existing files |
-| `read_file` | Implement | Read source for review or debugging |
-| `grep` | Implement | Search project files |
-| `run_python_sandbox` | Implement | Execute `src/main.py` with CadQuery in an isolated project cwd |
-| `load_skill` | Bootstrap | Load markdown skills for brainstorming and CAD conventions |
+| Tool | Purpose |
+|------|---------|
+| `search_cadquery_docs` | Hybrid vector + keyword search over indexed CadQuery HTML docs |
+| `write_file` | Create or overwrite project files |
+| `search_replace` | Patch existing files |
+| `read_file` | Read source for review or debugging |
+| `grep` | Search project files |
+| `run_python_sandbox` | Execute `src/main.py` with CadQuery in an isolated project cwd |
+| `load_skill` | Load markdown skills for brainstorming and CAD conventions |
 
 Doc search uses a local pgvector database and a cached chunk index. No external retrieval API.
 
@@ -139,15 +114,11 @@ Interactive chat keeps the model loaded across turns. Skills and doc context cac
 ```
 User prompt
     ↓
-Orchestrator classifies: chat or build
+Bootstrap skills + doc snippets
     ↓
-[build] Research subagent
-    seed docs → search if needed → Research Brief
+Agent: write_file → auto sandbox → fix loop → export
     ↓
-[build] Implementation subagent
-    write_file → auto sandbox → fix loop → export
-    ↓
-Desktop preview loads outputs/cube.step
+Desktop preview loads outputs/*.step
     ↓
 Agent summary to user
 ```

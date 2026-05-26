@@ -26,8 +26,7 @@ def get_skill_tool() -> StructuredTool:
         func=load_skill_tool,
         name="load_skill",
         description=(
-            "Load Markdown guidance for a named skill "
-            "(cad-generation, brainstorming, cad-debug)."
+            "Load Markdown guidance for a named skill (cad-generation, brainstorming, cad-debug)."
         ),
         args_schema=LoadSkillInput,
     )

@@ -12,7 +12,9 @@ from cad_llm.tools.docs.search import search_cadquery_docs
 
 
 class SearchCadQueryDocsInput(BaseModel):
-    query: str = Field(description="CadQuery API or feature to look up, e.g. Workplane extrude cutThruAll")
+    query: str = Field(
+        description="CadQuery API or feature to look up, e.g. Workplane extrude cutThruAll"
+    )
 
 
 def search_cadquery_docs_tool(query: str) -> str:

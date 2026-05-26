@@ -11,6 +11,9 @@ from langchain_core.retrievers import BaseRetriever
 from cad_llm.tools.docs.loader import load_chunks_cache
 from cad_llm.tools.docs.store import build_hybrid_retriever, build_vectorstore
 
+_DEFAULT_RESULT_LIMIT = 2
+_SNIPPET_CHARS = 600
+
 
 def _format_documents(documents: list[Document]) -> str:
     if not documents:
@@ -22,8 +25,8 @@ def _format_documents(documents: list[Document]) -> str:
         symbol_line = ""
         if isinstance(symbols, list) and symbols:
             symbol_line = f"symbols: {', '.join(str(s) for s in symbols)}\n"
-        snippet = doc.page_content[:1200]
-        source = doc.metadata.get("source", "cadquery")
+        snippet = doc.page_content[:_SNIPPET_CHARS]
+        source = Path(str(doc.metadata.get("source", "cadquery"))).name
         parts.append(f"[{idx}] source={source}\n{symbol_line}{snippet}")
     return "\n\n".join(parts)
 
@@ -92,7 +95,7 @@ def search_cadquery_docs(
     collection_name: str,
     embedding_model: str,
     chunks_cache: str | Path,
-    limit: int = 5,
+    limit: int = _DEFAULT_RESULT_LIMIT,
 ) -> str:
     chunks_path = Path(chunks_cache)
     retriever = _get_retriever(

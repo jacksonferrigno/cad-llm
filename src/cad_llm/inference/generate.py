@@ -13,7 +13,7 @@ SYSTEM_PROMPT = (
     "- CadQuery: always begin with `import cadquery as cq`. Never write `import cq`.\n"
     "- build123d: use `from build123d import ...` or `import build123d as bd`.\n"
     "CadQuery API (cadquery.readthedocs.io):\n"
-    "- Start from `cq.Workplane(\"XY\")` and chain documented methods "
+    '- Start from `cq.Workplane("XY")` and chain documented methods '
     "(.rect, .circle, .box, .extrude, .cut, .union, .faces, .chamfer).\n"
     "- Do not use `cq.Cylinder`, `cq.Cube`, or `Workplane.hexagon`; they are not CadQuery APIs.\n"
     "Output rules:\n"

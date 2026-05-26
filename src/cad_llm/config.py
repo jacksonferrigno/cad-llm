@@ -25,10 +25,10 @@ class Settings(BaseSettings):
     docs_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     docs_chunks_cache: Path = Path("artifacts/docs/cadquery_chunks.pkl")
 
-    # Vertex managed tuning: qwen/qwen3@qwen3-4b → Qwen/Qwen3-4B on Hugging Face.
-    vertex_base_model: str = "qwen/qwen3@qwen3-4b"
-    hf_model_id: str = "Qwen/Qwen3-4B"
-    mlx_model_id: str = "mlx-community/Qwen3-4B-4bit"
+    # Local default: Qwen3.5-4B from Hugging Face.
+    vertex_base_model: str = "Qwen/Qwen3.5-4B"
+    hf_model_id: str = "Qwen/Qwen3.5-4B"
+    mlx_model_id: str = "Qwen/Qwen3.5-4B"
     mlx_server_host: str = "127.0.0.1"
     mlx_server_port: int = 8080
 

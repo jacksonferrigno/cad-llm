@@ -18,6 +18,8 @@ Discuss first, build second.
 
 - `import cadquery as cq`
 - Chain from `cq.Workplane("XY")` using documented methods
+- Circular disk/flange: `.circle(radius).extrude(thickness)` — not `.box()` for round parts
+- Square through-hole: `.rect(w, h).cutThruAll()` — not `forConstruction=True`, not `.vertices()` before cut
 - Export: `cq.exporters.export(result, "outputs/file.step")`
 - Never: cq.Cylinder, cq.Cube, Workplane.hexagon, cq.exporters.step, cq.show, show_object, cq.Viewer
 

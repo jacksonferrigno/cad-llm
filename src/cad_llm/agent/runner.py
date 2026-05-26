@@ -23,14 +23,20 @@ from cad_llm.tools.binding import get_bound_agent_tools
 from cad_llm.tools.edit.tool import read_file
 from cad_llm.tools.workspace.project import ChatLayout, ProjectLayout
 
-SANDBOX_NUDGE = (
-    'Call run_python_sandbox with entrypoint "src/main.py". Tool call only.'
-)
+SANDBOX_NUDGE = 'Call run_python_sandbox with entrypoint "src/main.py". Tool call only.'
 TRUNCATED_TOOL_NUDGE = (
     "Your last tool call was cut off. Repeat the full <tool_call> block with complete JSON."
 )
+MALFORMED_TOOL_NUDGE = (
+    "Your last tool call was not valid JSON. Repeat it as exactly one <tool_call> block "
+    'containing JSON like {"name": "write_file", "arguments": {...}}. Tool call only.'
+)
 WRITE_SYNTAX_NUDGE = (
     "Fix the Python and call write_file again. Raw Python only — no markdown fences. Tool call only."
+)
+NO_CHANGE_NUDGE = (
+    "search_replace did not change the file. Make a material fix — patch the failing lines "
+    "or rewrite src/main.py."
 )
 
 
@@ -244,7 +250,22 @@ def run_agent(
             emit(AgentStep(kind="nudge", content=TRUNCATED_TOOL_NUDGE))
             continue
 
-        tool_calls = parse_tool_calls(raw)
+        try:
+            tool_calls = parse_tool_calls(raw)
+        except ValueError as exc:
+            messages.append({"role": "assistant", "content": raw})
+            append_event(
+                chat.transcript_path,
+                "assistant",
+                content=raw,
+                rejected=True,
+                reason="malformed_tool_call",
+                error=str(exc),
+            )
+            messages.append({"role": "user", "content": MALFORMED_TOOL_NUDGE})
+            append_event(chat.transcript_path, "nudge", content=MALFORMED_TOOL_NUDGE)
+            emit(AgentStep(kind="nudge", content=MALFORMED_TOOL_NUDGE))
+            continue
 
         if not tool_calls:
             visible = strip_model_response(raw)
@@ -283,7 +304,11 @@ def run_agent(
             )
             if call.name == "run_python_sandbox" and not _sandbox_failed(output):
                 _inject_review_context(project=project, prompt=prompt, messages=messages)
-            if call.name in {"write_file", "search_replace"} and _write_syntax_failed(output):
+            if call.name in {"write_file", "search_replace"} and output == "no_change":
+                messages.append({"role": "user", "content": NO_CHANGE_NUDGE})
+                append_event(chat.transcript_path, "nudge", content=NO_CHANGE_NUDGE)
+                emit(AgentStep(kind="nudge", content=NO_CHANGE_NUDGE))
+            elif call.name in {"write_file", "search_replace"} and _write_syntax_failed(output):
                 nudge = f"{output}\n\n{WRITE_SYNTAX_NUDGE}"
                 messages.append({"role": "user", "content": nudge})
                 append_event(chat.transcript_path, "nudge", content=WRITE_SYNTAX_NUDGE)
