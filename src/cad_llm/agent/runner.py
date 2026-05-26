@@ -16,13 +16,16 @@ from cad_llm.agent.generate import generate_completion
 from cad_llm.agent.parse import ParsedToolCall, has_incomplete_tool_call, parse_tool_calls
 from cad_llm.agent.steps import AgentStep, RunState
 from cad_llm.agent.summary import summarize_tool_call
-from cad_llm.agent.transcript import append_event, write_run_summary
+from cad_llm.agent.transcript import append_event, read_chat_history, write_run_summary
+from cad_llm.config import settings
 from cad_llm.inference.extract import strip_model_response
 from cad_llm.inference.generate import CadGenerator
 from cad_llm.tools.binding import get_bound_agent_tools
 from cad_llm.tools.edit.tool import read_file
+from cad_llm.tools.skills.loader import load_skill
 from cad_llm.tools.workspace.project import ChatLayout, ProjectLayout
 
+SANDBOX_PASSED_MESSAGE = "Sandbox passed."
 SANDBOX_NUDGE = 'Call run_python_sandbox with entrypoint "src/main.py". Tool call only.'
 TRUNCATED_TOOL_NUDGE = (
     "Your last tool call was cut off. Repeat the full <tool_call> block with complete JSON."
@@ -37,6 +40,11 @@ WRITE_SYNTAX_NUDGE = (
 NO_CHANGE_NUDGE = (
     "search_replace did not change the file. Make a material fix — patch the failing lines "
     "or rewrite src/main.py."
+)
+DOC_LOOP_NUDGE = (
+    "You already searched the docs. Rewrite src/main.py with write_file or search_replace "
+    "using what you know. Do not call search_cadquery_docs again until the file changes. "
+    "Tool call only."
 )
 
 
@@ -121,41 +129,88 @@ def _force_sandbox_run(
     )
 
 
-def _inject_review_context(
+def _inject_failure_context(
     *,
     project: ProjectLayout,
-    prompt: str,
+    sandbox_output: str,
     messages: list[dict[str, str]],
+    chat: ChatLayout,
 ) -> None:
     try:
         src = read_file(project.root, "src/main.py")
     except Exception:  # noqa: BLE001
-        return
+        src = "(could not read src/main.py)"
+    try:
+        debug_skill = load_skill("cad-debug").strip()
+    except Exception:  # noqa: BLE001
+        debug_skill = "(cad-debug skill unavailable)"
+
     messages.append(
         {
             "role": "user",
             "content": (
-                "Sandbox passed. Review src/main.py against the user's request.\n\n"
-                f"Request: {prompt}\n\n"
+                "Sandbox failed. Fix src/main.py using the debug workflow below.\n\n"
+                f"--- sandbox output ---\n{sandbox_output}\n---\n\n"
                 f"--- src/main.py ---\n{src}\n---\n\n"
-                "If it matches: brief summary only. If not: fix with tools."
+                f"--- cad-debug ---\n{debug_skill}\n---"
             ),
         }
     )
+    append_event(chat.transcript_path, "nudge", content="sandbox_failure_context")
+
+
+def _complete_after_sandbox_success(
+    *,
+    chat: ChatLayout,
+    emit: Callable[[AgentStep], None],
+) -> str:
+    append_event(chat.transcript_path, "assistant", content=SANDBOX_PASSED_MESSAGE)
+    emit(AgentStep(kind="assistant", content=SANDBOX_PASSED_MESSAGE))
+    return SANDBOX_PASSED_MESSAGE
+
+
+def _build_initial_messages(
+    *,
+    system_prompt: str,
+    prompt: str,
+    chat: ChatLayout,
+    project: ProjectLayout,
+) -> tuple[list[dict[str, str]], bool]:
+    history = read_chat_history(
+        chat.transcript_path,
+        exclude_last_user=prompt,
+    )
+    continuing = bool(history)
+
+    user_content = prompt
+    if continuing:
+        try:
+            src = read_file(project.root, "src/main.py")
+        except Exception:  # noqa: BLE001
+            pass
+        else:
+            user_content = (
+                f"{prompt}\n\n"
+                f"--- current src/main.py ---\n{src}\n---"
+            )
+
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+    messages.extend(history)
+    messages.append({"role": "user", "content": user_content})
+    return messages, continuing
 
 
 def _auto_sandbox_after_src_edit(
     *,
     project: ProjectLayout,
-    prompt: str,
     tools_by_name: dict[str, StructuredTool],
     messages: list[dict[str, str]],
     chat: ChatLayout,
     emit: Callable[[AgentStep], None],
     state: RunState,
-) -> None:
+) -> bool:
     if not state.needs_sandbox():
-        return
+        return False
     output = _force_sandbox_run(
         project=project,
         tools_by_name=tools_by_name,
@@ -164,8 +219,15 @@ def _auto_sandbox_after_src_edit(
         emit=emit,
         state=state,
     )
-    if not _sandbox_failed(output):
-        _inject_review_context(project=project, prompt=prompt, messages=messages)
+    if _sandbox_failed(output):
+        _inject_failure_context(
+            project=project,
+            sandbox_output=output,
+            messages=messages,
+            chat=chat,
+        )
+        return False
+    return True
 
 
 def run_agent(
@@ -176,7 +238,7 @@ def run_agent(
     model_id: str | None = None,
     generator: CadGenerator | None = None,
     max_steps: int = 15,
-    max_tokens: int = 2048,
+    max_tokens: int | None = None,
     on_step: Callable[[AgentStep], None] | None = None,
     generate_fn: GenerateFn | None = None,
     bootstrap: bool = True,
@@ -193,6 +255,7 @@ def run_agent(
     gen.load()
     model = gen.model
     tokenizer = gen.tokenizer
+    token_budget = max_tokens if max_tokens is not None else settings.agent_max_tokens
 
     steps: list[AgentStep] = []
     state = RunState()
@@ -221,10 +284,14 @@ def run_agent(
 
         system_prompt = AGENT_SYSTEM_PROMPT
 
-    messages: list[dict[str, str]] = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt},
-    ]
+    messages, continuing = _build_initial_messages(
+        system_prompt=system_prompt,
+        prompt=prompt,
+        chat=chat,
+        project=project,
+    )
+    if continuing and (project.root / "src" / "main.py").is_file():
+        state.has_src_write = True
 
     final_response = ""
 
@@ -234,13 +301,13 @@ def run_agent(
             tools=openai_tools,
             tokenize=False,
             add_generation_prompt=True,
-            enable_thinking=False,
+            enable_thinking=settings.enable_thinking,
         )
 
         if generate_fn is not None:
-            raw = generate_fn(model, tokenizer, formatted, max_tokens)
+            raw = generate_fn(model, tokenizer, formatted, token_budget)
         else:
-            raw = generate_completion(model, tokenizer, formatted, max_tokens)
+            raw = generate_completion(model, tokenizer, formatted, token_budget)
 
         if has_incomplete_tool_call(raw):
             messages.append({"role": "assistant", "content": raw})
@@ -302,8 +369,13 @@ def run_agent(
                 record_state=state,
                 project=project,
             )
-            if call.name == "run_python_sandbox" and not _sandbox_failed(output):
-                _inject_review_context(project=project, prompt=prompt, messages=messages)
+            if call.name == "run_python_sandbox" and _sandbox_failed(output):
+                _inject_failure_context(
+                    project=project,
+                    sandbox_output=output,
+                    messages=messages,
+                    chat=chat,
+                )
             if call.name in {"write_file", "search_replace"} and output == "no_change":
                 messages.append({"role": "user", "content": NO_CHANGE_NUDGE})
                 append_event(chat.transcript_path, "nudge", content=NO_CHANGE_NUDGE)
@@ -313,32 +385,39 @@ def run_agent(
                 messages.append({"role": "user", "content": nudge})
                 append_event(chat.transcript_path, "nudge", content=WRITE_SYNTAX_NUDGE)
                 emit(AgentStep(kind="nudge", content=WRITE_SYNTAX_NUDGE))
+            elif call.name == "search_cadquery_docs":
+                query = str(call.arguments.get("query", ""))
+                if state.doc_search_loop_detected(query):
+                    messages.append({"role": "user", "content": DOC_LOOP_NUDGE})
+                    append_event(chat.transcript_path, "nudge", content=DOC_LOOP_NUDGE)
+                    emit(AgentStep(kind="nudge", content=DOC_LOOP_NUDGE))
 
-        _auto_sandbox_after_src_edit(
+        if _auto_sandbox_after_src_edit(
             project=project,
-            prompt=prompt,
             tools_by_name=tools_by_name,
             messages=messages,
             chat=chat,
             emit=emit,
             state=state,
-        )
+        ):
+            final_response = _complete_after_sandbox_success(chat=chat, emit=emit)
+            break
     else:
         final_response = "Stopped: reached max agent steps without a final reply."
         append_event(chat.transcript_path, "assistant", content=final_response, truncated=True)
         emit(AgentStep(kind="assistant", content=final_response))
 
     if state.needs_sandbox():
-        _auto_sandbox_after_src_edit(
+        if _auto_sandbox_after_src_edit(
             project=project,
-            prompt=prompt,
             tools_by_name=tools_by_name,
             messages=messages,
             chat=chat,
             emit=emit,
             state=state,
-        )
-        if not final_response:
+        ):
+            final_response = _complete_after_sandbox_success(chat=chat, emit=emit)
+        elif not final_response:
             final_response = "Stopped: reached max agent steps."
 
     run_summary_path = chat.root / f"run_{datetime.now(tz=UTC).strftime('%Y%m%dT%H%M%SZ')}.json"

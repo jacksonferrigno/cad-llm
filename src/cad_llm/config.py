@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     mlx_server_host: str = "127.0.0.1"
     mlx_server_port: int = 8080
 
+    enable_thinking: bool = True
+    agent_max_tokens: int = 2048
+
     def resolve(self, path: Path) -> Path:
         if path.is_absolute():
             return path

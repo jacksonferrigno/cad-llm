@@ -59,3 +59,72 @@ def test_run_state_ignores_non_src_writes() -> None:
     )
     assert state.needs_write()
     assert not state.needs_sandbox()
+
+
+def test_no_change_and_no_match_do_not_mark_dirty() -> None:
+    state = RunState()
+    state.record_tool_result(
+        "search_replace",
+        {"path": "src/main.py", "old": "a", "new": "a"},
+        "no_change",
+    )
+    assert not state.has_src_write
+    assert not state.needs_sandbox()
+
+    state.record_tool_result(
+        "search_replace",
+        {"path": "src/main.py", "old": "missing", "new": "x"},
+        "no_match",
+    )
+    assert not state.has_src_write
+    assert not state.needs_sandbox()
+
+
+def test_failed_sandbox_clears_dirty_until_next_edit() -> None:
+    state = RunState()
+    state.record_tool_result("write_file", {"path": "src/main.py", "content": "x"}, "src/main.py")
+    assert state.needs_sandbox()
+
+    state.record_tool_result(
+        "run_python_sandbox",
+        {"entrypoint": "src/main.py"},
+        "exit_code=1\n\nstderr:\nboom",
+    )
+    assert not state.needs_sandbox()
+
+    state.record_tool_result(
+        "search_cadquery_docs",
+        {"query": "Workplane.box"},
+        "hits",
+    )
+    assert not state.needs_sandbox()
+
+    state.record_tool_result(
+        "search_replace",
+        {"path": "src/main.py", "old": "x", "new": "y"},
+        "ok",
+    )
+    assert state.needs_sandbox()
+
+
+def test_doc_search_loop_detected_after_sandbox_failure() -> None:
+    state = RunState()
+    state.record_tool_result(
+        "run_python_sandbox",
+        {"entrypoint": "src/main.py"},
+        "exit_code=1\n\nstderr:\nboom",
+    )
+    assert state.awaiting_src_fix
+
+    state.record_tool_result("search_cadquery_docs", {"query": "sphere cut"}, "hits")
+    assert not state.doc_search_loop_detected("sphere cut")
+
+    state.record_tool_result("search_cadquery_docs", {"query": "sphere cut"}, "hits")
+    assert state.doc_search_loop_detected("sphere cut")
+
+
+def test_doc_search_loop_not_detected_outside_recovery() -> None:
+    state = RunState()
+    state.record_tool_result("search_cadquery_docs", {"query": "box"}, "hits")
+    state.record_tool_result("search_cadquery_docs", {"query": "box"}, "hits")
+    assert not state.doc_search_loop_detected("box")

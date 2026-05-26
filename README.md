@@ -4,7 +4,7 @@
 
 ## Demo
 
-Prompt: *generate 90mm circular flange, 15mm thick, 30mm square through-hole at center*
+Prompt: *generate a 80×80×40mm block with 20mm radius hemispherical pocket on top face*
 
 ![Demo](media/demo.gif)
 

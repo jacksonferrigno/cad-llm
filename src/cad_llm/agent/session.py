@@ -16,8 +16,9 @@ class AgentSession:
     chat: ChatLayout
     generator: CadGenerator
     max_steps: int = 15
-    max_tokens: int = 2048
+    max_tokens: int | None = None
     _turn_count: int = field(default=0, repr=False)
+    _cached_skill: str | None = field(default=None, repr=False)
 
     @classmethod
     def create(
@@ -28,7 +29,7 @@ class AgentSession:
         model_id: str | None = None,
         generator: CadGenerator | None = None,
         max_steps: int = 15,
-        max_tokens: int = 2048,
+        max_tokens: int | None = None,
     ) -> AgentSession:
         gen = generator or CadGenerator(model_id=model_id)
         if gen.model is None:
@@ -50,7 +51,8 @@ class AgentSession:
     ) -> AgentRunResult:
         self._turn_count += 1
 
-        return run_agent(
+        first_turn = self._turn_count == 1
+        result = run_agent(
             self.project,
             self.chat,
             prompt,
@@ -59,4 +61,10 @@ class AgentSession:
             on_step=on_step,
             generate_fn=generate_fn,
             generator=self.generator,
+            cached_skill=self._cached_skill,
+            bootstrap_skill=first_turn,
+            bootstrap_docs=first_turn,
         )
+        if result.skill_content:
+            self._cached_skill = result.skill_content
+        return result

@@ -12,7 +12,7 @@ import customtkinter as ctk
 
 from cad_llm.agent.session import AgentSession
 from cad_llm.agent.steps import AgentStep
-from cad_llm.app.formatting import format_assistant_reply, format_step
+from cad_llm.app.formatting import format_assistant_reply
 from cad_llm.app.mesh import latest_mesh
 from cad_llm.app.theme import (
     ACCENT,
@@ -34,7 +34,8 @@ from cad_llm.app.theme import (
     TEXT,
     USER,
 )
-from cad_llm.app.phase_block import PhaseBlock
+from cad_llm.agent.summary import summarize_tool_call
+from cad_llm.app.activity_block import ActivityBlock
 from cad_llm.app.viewer import CadViewerPanel
 from cad_llm.config import settings
 from cad_llm.inference.generate import CadGenerator
@@ -96,9 +97,7 @@ class CadDesktopApp(ctk.CTk):
         self._preloaded: CadGenerator | None = None
         self._busy = False
         self._events: queue.Queue[tuple[str, Any]] = queue.Queue()
-        self._active_phase: PhaseBlock | None = None
-        self._phase_seq = 0
-        self._last_assistant_in_phase: str | None = None
+        self._activity: ActivityBlock | None = None
 
         self._build_layout()
         self._refresh_projects()
@@ -313,6 +312,7 @@ class CadDesktopApp(ctk.CTk):
         self._prompt.delete(0, "end")
         self._transcript.append_line(f"you › {text}", "user")
         self._set_busy(True)
+        self._ensure_activity()
         threading.Thread(target=self._run_agent, args=(text,), daemon=True).start()
 
     def _set_busy(self, busy: bool) -> None:
@@ -366,100 +366,59 @@ class CadDesktopApp(ctk.CTk):
             elif kind == "mesh":
                 self._viewer.show_mesh_path(payload)
             elif kind == "error":
-                self._close_active_phase()
+                self._finish_activity()
                 self._transcript.append_line(f"error  {payload}", "error")
             elif kind == "idle":
-                self._close_active_phase()
+                self._finish_activity()
                 self._set_busy(False)
         self.after(100, self._poll_events)
 
-    # ── phase / step routing ────────────────────────────────────────────────
+    # ── activity / step routing ─────────────────────────────────────────────
 
     def _handle_step(self, step: AgentStep) -> None:
-        if step.kind == "phase":
-            self._close_active_phase()
-            self._open_phase(step.content)
-            return
-
-        if self._active_phase is None:
-            if step.kind == "assistant":
-                text = format_assistant_reply(step.content)
-                if text:
-                    self._transcript.append_line(f"agent › {text}", "done")
-                return
-            tag, line = format_step(step)
-            if line:
-                self._transcript.append_line(line, tag)
-            return
-
-        tag, line = format_step(step)
-        is_error = tag == "error"
         if step.kind == "assistant":
+            self._finish_activity()
             text = format_assistant_reply(step.content)
             if text:
-                self._last_assistant_in_phase = text
+                self._transcript.append_line(f"agent › {text}", "done")
             return
-        self._active_phase.record_step(is_error=is_error)
-        if line:
-            self._append_detail_line(line, tag)
 
-    def _open_phase(self, phase: str) -> None:
-        self._phase_seq += 1
-        block = PhaseBlock(
-            self._transcript,
-            phase=phase,
-            on_toggle=self._toggle_phase,
-        )
-        block._detail_tag = f"phase_detail_{self._phase_seq}"  # type: ignore[attr-defined]
+        self._ensure_activity()
+
+        if step.kind == "tool_call":
+            assert step.tool_name is not None
+            summary = summarize_tool_call(step.tool_name, step.tool_args or {})
+            self._activity.set_status(summary)  # type: ignore[union-attr]
+        elif step.kind == "bootstrap":
+            label = "skill" if step.tool_name == "load_skill" else "docs"
+            self._activity.set_status(f"loading {label}")  # type: ignore[union-attr]
+
+    def _ensure_activity(self) -> None:
+        if self._activity is not None:
+            return
+        block = ActivityBlock(self._transcript)
         inner = self._transcript._textbox
         inner.configure(state="normal")
-        inner.tag_configure(
-            block._detail_tag,
-            elide=True,
-            lmargin1=24,
-            lmargin2=24,
-            spacing1=0,
-            spacing3=0,
-        )
         if inner.compare("end-1c", ">", "1.0") and inner.get("end-2c", "end-1c") != "\n":
             inner.insert("end", "\n")
+        block._embed_index = inner.index("end")
         inner.window_create("end", window=block, padx=4, pady=2)
         inner.see("end")
         inner.configure(state="disabled")
-        self._active_phase = block
-        self._last_assistant_in_phase = None
+        self._activity = block
 
-    def _append_detail_line(self, text: str, tag: str) -> None:
-        if self._active_phase is None:
-            return
-        detail_tag = self._active_phase._detail_tag  # type: ignore[attr-defined]
-        inner = self._transcript._textbox
-        inner.configure(state="normal")
-        inner.insert("end", f"{text}\n", (detail_tag, tag))
-        inner.configure(state="disabled")
-
-    def _close_active_phase(self) -> None:
-        block = self._active_phase
+    def _finish_activity(self) -> None:
+        block = self._activity
         if block is None:
             return
-        block.finish()
-        phase = block.phase
-        reveal = self._last_assistant_in_phase if phase in {"implement", "chat"} else None
-        self._active_phase = None
-        self._last_assistant_in_phase = None
-        if reveal:
-            inner = self._transcript._textbox
-            inner.configure(state="normal")
-            inner.insert("end", f"agent › {reveal}\n", "done")
-            inner.see("end")
-            inner.configure(state="disabled")
-
-    def _toggle_phase(self, block: PhaseBlock) -> None:
+        block.stop()
         inner = self._transcript._textbox
-        detail_tag = block._detail_tag  # type: ignore[attr-defined]
-        current = inner.tag_cget(detail_tag, "elide")
-        hidden = str(current).lower() in {"1", "true"}
-        inner.tag_configure(detail_tag, elide=not hidden)
+        inner.configure(state="normal")
+        if block._embed_index is not None:
+            inner.delete(block._embed_index)
+        inner.configure(state="disabled")
+        block.destroy()
+        self._activity = None
 
 
 def run() -> None:
