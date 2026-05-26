@@ -105,3 +105,26 @@ def test_failed_sandbox_clears_dirty_until_next_edit() -> None:
         "ok",
     )
     assert state.needs_sandbox()
+
+
+def test_doc_search_loop_detected_after_sandbox_failure() -> None:
+    state = RunState()
+    state.record_tool_result(
+        "run_python_sandbox",
+        {"entrypoint": "src/main.py"},
+        "exit_code=1\n\nstderr:\nboom",
+    )
+    assert state.awaiting_src_fix
+
+    state.record_tool_result("search_cadquery_docs", {"query": "sphere cut"}, "hits")
+    assert not state.doc_search_loop_detected("sphere cut")
+
+    state.record_tool_result("search_cadquery_docs", {"query": "sphere cut"}, "hits")
+    assert state.doc_search_loop_detected("sphere cut")
+
+
+def test_doc_search_loop_not_detected_outside_recovery() -> None:
+    state = RunState()
+    state.record_tool_result("search_cadquery_docs", {"query": "box"}, "hits")
+    state.record_tool_result("search_cadquery_docs", {"query": "box"}, "hits")
+    assert not state.doc_search_loop_detected("box")

@@ -41,6 +41,11 @@ NO_CHANGE_NUDGE = (
     "search_replace did not change the file. Make a material fix — patch the failing lines "
     "or rewrite src/main.py."
 )
+DOC_LOOP_NUDGE = (
+    "You already searched the docs. Rewrite src/main.py with write_file or search_replace "
+    "using what you know. Do not call search_cadquery_docs again until the file changes. "
+    "Tool call only."
+)
 
 
 @dataclass
@@ -380,6 +385,12 @@ def run_agent(
                 messages.append({"role": "user", "content": nudge})
                 append_event(chat.transcript_path, "nudge", content=WRITE_SYNTAX_NUDGE)
                 emit(AgentStep(kind="nudge", content=WRITE_SYNTAX_NUDGE))
+            elif call.name == "search_cadquery_docs":
+                query = str(call.arguments.get("query", ""))
+                if state.doc_search_loop_detected(query):
+                    messages.append({"role": "user", "content": DOC_LOOP_NUDGE})
+                    append_event(chat.transcript_path, "nudge", content=DOC_LOOP_NUDGE)
+                    emit(AgentStep(kind="nudge", content=DOC_LOOP_NUDGE))
 
         if _auto_sandbox_after_src_edit(
             project=project,

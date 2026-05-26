@@ -33,8 +33,7 @@ class Settings(BaseSettings):
     mlx_server_port: int = 8080
 
     enable_thinking: bool = True
-    agent_max_tokens: int = 4096
-    agent_final_tokens: int = 256
+    agent_max_tokens: int = 2048
 
     def resolve(self, path: Path) -> Path:
         if path.is_absolute():

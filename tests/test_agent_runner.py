@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from cad_llm.agent.runner import run_agent
+from cad_llm.agent.runner import DOC_LOOP_NUDGE, run_agent
 from cad_llm.agent.transcript import append_event
 from cad_llm.tools.workspace import create_chat, create_project
 
@@ -233,3 +233,46 @@ def test_run_agent_follow_up_turn_includes_history_and_src(tmp_path: Path) -> No
     assert any("cutBlind instead" in prompt for prompt in captured)
     assert any("--- current src/main.py ---" in prompt for prompt in captured)
     assert any("cutThruAll()" in prompt for prompt in captured)
+
+
+def test_run_agent_nudges_after_repeated_doc_search_during_recovery(tmp_path: Path) -> None:
+    projects_root = tmp_path / "projects"
+    project = create_project(projects_root, name="demo", project_id="demo08")
+    chat = create_chat(project, title="test", chat_id="chat08")
+
+    responses = [
+        (
+            '<tool_call>\n{"name": "write_file", "arguments": '
+            '{"path": "src/main.py", "content": "raise RuntimeError(\\"boom\\")\\n"}}\n</tool_call>'
+        ),
+        (
+            '<tool_call>\n{"name": "search_cadquery_docs", "arguments": '
+            '{"query": "sphere cut"}}\n</tool_call>'
+        ),
+        (
+            '<tool_call>\n{"name": "search_cadquery_docs", "arguments": '
+            '{"query": "sphere cut"}}\n</tool_call>'
+        ),
+        (
+            '<tool_call>\n{"name": "write_file", "arguments": '
+            '{"path": "src/main.py", "content": "print(1)\\n"}}\n</tool_call>'
+        ),
+    ]
+    call_count = {"n": 0}
+
+    def fake_generate(_model, _tokenizer, _prompt: str, _max_tokens: int) -> str:
+        idx = call_count["n"]
+        call_count["n"] += 1
+        return responses[min(idx, len(responses) - 1)]
+
+    run_agent(
+        project,
+        chat,
+        "Build a block",
+        generate_fn=fake_generate,
+        max_steps=6,
+        bootstrap=False,
+    )
+
+    events = [json.loads(line) for line in chat.transcript_path.read_text().strip().splitlines()]
+    assert any(event.get("type") == "nudge" and event.get("content") == DOC_LOOP_NUDGE for event in events)

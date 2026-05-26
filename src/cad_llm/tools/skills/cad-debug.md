@@ -3,7 +3,7 @@
 When sandbox returns non-zero:
 
 1. **read_file** — the failing file and traceback line.
-2. **search_cadquery_docs** — query the user's goal, not just the error string.
+2. **search_cadquery_docs** — at most once for the user's goal, not the raw error string.
 3. **write_file** or **search_replace** — fix using documented APIs only.
 4. **run_python_sandbox** again.
 
