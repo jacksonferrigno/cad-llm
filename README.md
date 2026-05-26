@@ -6,7 +6,7 @@
 
 Prompt: *generate 90mm circular flange, 15mm thick, 30mm square through-hole at center*
 
-<video src="media/demo.mp4" autoplay loop muted playsinline controls width="100%"></video>
+![Demo](media/demo.gif)
 
 ## What it does
 
