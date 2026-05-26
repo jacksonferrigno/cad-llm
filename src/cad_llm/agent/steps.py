@@ -25,13 +25,21 @@ class RunState:
         self.tools_called.add(name)
         if name in {"write_file", "search_replace"}:
             path = str(arguments.get("path", ""))
-            if path.replace("\\", "/").startswith("src/") and not output.startswith("error:"):
+            if path.replace("\\", "/").startswith("src/") and self._src_edit_applied(name, output):
                 self.has_src_write = True
                 self.src_dirty = True
         if name == "run_python_sandbox":
             first = output.splitlines()[0] if output else ""
-            if first.startswith("exit_code=0"):
+            if first.startswith("exit_code="):
                 self.src_dirty = False
+
+    @staticmethod
+    def _src_edit_applied(name: str, output: str) -> bool:
+        if output.startswith("error:") or output in {"no_change", "no_match"}:
+            return False
+        if name == "search_replace":
+            return output == "ok"
+        return True
 
     def needs_write(self) -> bool:
         return not self.has_src_write
