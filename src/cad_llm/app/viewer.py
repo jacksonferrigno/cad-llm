@@ -15,13 +15,10 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from cad_llm.app import theme
 from cad_llm.app.mesh import load_trimesh
 
-# Viewer-specific colors (muted — not full neon)
-_MESH_BASE = (0.52, 0.62, 0.72)
-_GRID = "#2a2a34"
-_AXIS_X = "#c45c5c"
-_AXIS_Y = "#6ba368"
-_AXIS_Z = "#6a8fc4"
-_EDGE = (0.35, 0.45, 0.55, 0.18)
+_MESH_BASE = (0.55, 0.62, 0.70)
+_GRID = "#3a3a48"
+_CARD = "#16161c"
+_CARD_BORDER = "#22222c"
 
 
 class CadViewerPanel(ctk.CTkFrame):
@@ -32,15 +29,26 @@ class CadViewerPanel(ctk.CTkFrame):
         self._view_center: np.ndarray | None = None
         self._view_half: float = 1.0
 
-        header = ctk.CTkFrame(self, fg_color=theme.PANEL, corner_radius=0)
-        header.pack(fill="x", padx=12, pady=(12, 0))
+        header = ctk.CTkFrame(self, fg_color=theme.PANEL, corner_radius=0, height=32)
+        header.pack(fill="x", padx=16, pady=(14, 0))
+        header.pack_propagate(False)
+
+        title_wrap = ctk.CTkFrame(header, fg_color="transparent")
+        title_wrap.pack(side="left")
         ctk.CTkLabel(
-            header,
+            title_wrap,
+            text="●",
+            font=("SF Pro Display", 11),
+            text_color=theme.ACCENT,
+        ).pack(side="left", padx=(0, 6))
+        ctk.CTkLabel(
+            title_wrap,
             text="CAD PREVIEW",
             font=theme.FONT_TITLE,
-            text_color=theme.ACCENT,
+            text_color=theme.TEXT,
             anchor="w",
         ).pack(side="left")
+
         self._filename = ctk.CTkLabel(
             header,
             text="",
@@ -52,27 +60,36 @@ class CadViewerPanel(ctk.CTkFrame):
 
         ctk.CTkLabel(
             self,
-            text="drag to orbit  ·  scroll to zoom",
+            text="drag to orbit   ·   scroll to zoom",
             font=theme.FONT_UI,
             text_color=theme.MUTED,
             anchor="w",
-        ).pack(fill="x", padx=12, pady=(2, 0))
+        ).pack(fill="x", padx=16, pady=(4, 10))
 
-        self._plot_host = tk.Frame(self, bg=theme.BG, highlightthickness=0)
-        self._plot_host.pack(fill="both", expand=True, padx=12, pady=12)
+        card = ctk.CTkFrame(
+            self,
+            fg_color=_CARD,
+            corner_radius=10,
+            border_width=1,
+            border_color=_CARD_BORDER,
+        )
+        card.pack(fill="both", expand=True, padx=16, pady=(0, 16))
 
-        self._figure = Figure(figsize=(4.5, 4.5), facecolor=theme.BG)
+        self._plot_host = tk.Frame(card, bg=_CARD, highlightthickness=0)
+        self._plot_host.pack(fill="both", expand=True, padx=8, pady=8)
+
+        self._figure = Figure(figsize=(4.5, 4.5), facecolor=_CARD)
         self._figure.subplots_adjust(left=0, right=1, bottom=0, top=1)
-        self._axes = self._figure.add_subplot(111, projection="3d", facecolor=theme.BG)
+        self._axes = self._figure.add_subplot(111, projection="3d", facecolor=_CARD)
         self._mpl_canvas = FigureCanvasTkAgg(self._figure, master=self._plot_host)
         widget = self._mpl_canvas.get_tk_widget()
-        widget.configure(bg=theme.BG, highlightthickness=0)
+        widget.configure(bg=_CARD, highlightthickness=0)
         widget.pack(fill="both", expand=True)
         self._mpl_canvas.mpl_connect("scroll_event", self._on_scroll)
         self._show_empty()
 
     def _style_axes(self) -> None:
-        self._axes.set_facecolor(theme.BG)
+        self._axes.set_facecolor(_CARD)
         self._axes.set_axis_off()
         self._axes.grid(False)
 
@@ -96,14 +113,15 @@ class CadViewerPanel(ctk.CTkFrame):
 
     def _face_colors(self, mesh: Any) -> np.ndarray:
         normals = mesh.face_normals
-        light = np.array([0.35, 0.25, 0.9], dtype=float)
+        light = np.array([0.4, 0.3, 0.85], dtype=float)
         light /= np.linalg.norm(light)
-        shade = 0.38 + 0.62 * np.clip(normals @ light, 0.0, 1.0)
+        shade = 0.42 + 0.58 * np.clip(normals @ light, 0.0, 1.0)
         rgb = np.outer(shade, _MESH_BASE)
-        return np.column_stack([rgb, np.full(len(shade), 0.96)])
+        return np.column_stack([rgb, np.ones(len(shade))])
 
     def _draw_floor_grid(self, center: np.ndarray, half: float, z_floor: float) -> None:
-        steps = 10
+        """Subtle ground grid — reference only, no axis labels."""
+        steps = 8
         xs = np.linspace(center[0] - half, center[0] + half, steps)
         ys = np.linspace(center[1] - half, center[1] + half, steps)
         for x in xs:
@@ -112,8 +130,8 @@ class CadViewerPanel(ctk.CTkFrame):
                 [center[1] - half, center[1] + half],
                 [z_floor, z_floor],
                 color=_GRID,
-                linewidth=0.45,
-                alpha=0.55,
+                linewidth=0.5,
+                alpha=0.7,
             )
         for y in ys:
             self._axes.plot(
@@ -121,37 +139,8 @@ class CadViewerPanel(ctk.CTkFrame):
                 [y, y],
                 [z_floor, z_floor],
                 color=_GRID,
-                linewidth=0.45,
-                alpha=0.55,
-            )
-
-    def _draw_axis_gizmo(self, origin: np.ndarray, half: float) -> None:
-        length = half * 0.42
-        o = origin
-        axes = [
-            (np.array([length, 0, 0]), _AXIS_X, "X"),
-            (np.array([0, length, 0]), _AXIS_Y, "Y"),
-            (np.array([0, 0, length]), _AXIS_Z, "Z"),
-        ]
-        for delta, color, label in axes:
-            end = o + delta
-            self._axes.plot(
-                [o[0], end[0]],
-                [o[1], end[1]],
-                [o[2], end[2]],
-                color=color,
-                linewidth=1.4,
-                alpha=0.85,
-            )
-            self._axes.text(
-                end[0],
-                end[1],
-                end[2],
-                label,
-                color=color,
-                fontsize=8,
-                ha="center",
-                va="center",
+                linewidth=0.5,
+                alpha=0.7,
             )
 
     def _show_empty(self) -> None:
@@ -196,16 +185,15 @@ class CadViewerPanel(ctk.CTkFrame):
 
         self._axes.clear()
         self._style_axes()
-
         self._draw_floor_grid(center, half, z_floor)
-        self._draw_axis_gizmo(center, half)
 
         verts = mesh.vertices[mesh.faces]
         collection = Poly3DCollection(
             verts,
             facecolors=self._face_colors(mesh),
-            edgecolors=_EDGE,
-            linewidths=0.12,
+            edgecolors="none",
+            linewidths=0,
+            antialiased=True,
         )
         self._axes.add_collection3d(collection)
 

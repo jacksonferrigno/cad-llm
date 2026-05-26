@@ -1,10 +1,12 @@
 # CAD debug (sandbox failures)
 
-When the **sandbox run fails** (build error, traceback, or CAD script exit non-zero):
+When sandbox returns non-zero:
 
-1. **`read_file`** — open the traceback paths and the files you last changed; confirm line context.
-2. **`grep`** — locate symbols, imports, or duplicate definitions related to the failure.
-3. **`search_replace`** — apply a minimal fix aligned with the error message.
-4. **Re-run** the sandbox command that failed.
+1. **read_file** — the failing file and traceback line.
+2. **search_cadquery_docs** — query the user's goal, not just the error string.
+3. **write_file** or **search_replace** — fix using documented APIs only.
+4. **run_python_sandbox** again.
 
-Limit this loop to **at most 3 retries** for the same failing step. After three attempts, stop, summarize what was tried, and ask for direction or a narrower hypothesis instead of spinning.
+If the same error happens twice, stop tweaking the same line — you likely picked the wrong API. Search docs and rewrite.
+
+After three failed attempts on the same error, stop and ask the user for direction.

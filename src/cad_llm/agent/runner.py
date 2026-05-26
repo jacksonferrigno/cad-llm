@@ -14,79 +14,24 @@ from langchain_core.tools import StructuredTool
 from cad_llm.agent.bootstrap import bootstrap_system_prompt
 from cad_llm.agent.generate import generate_completion
 from cad_llm.agent.parse import ParsedToolCall, has_incomplete_tool_call, parse_tool_calls
-from cad_llm.agent.recovery import (
-    build_sandbox_recovery_message,
-    docs_query_from_failure,
-    fetch_cadquery_docs,
-)
 from cad_llm.agent.steps import AgentStep, RunState
 from cad_llm.agent.summary import summarize_tool_call
 from cad_llm.agent.transcript import append_event, write_run_summary
 from cad_llm.inference.extract import strip_model_response
 from cad_llm.inference.generate import CadGenerator
 from cad_llm.tools.binding import get_bound_agent_tools
+from cad_llm.tools.edit.tool import read_file
 from cad_llm.tools.workspace.project import ChatLayout, ProjectLayout
 
 SANDBOX_NUDGE = (
-    "You changed src/ files but sandbox has not passed since the last edit. "
-    'Call run_python_sandbox with entrypoint "src/main.py". Use a tool call only.'
+    'Call run_python_sandbox with entrypoint "src/main.py". Tool call only.'
 )
 TRUNCATED_TOOL_NUDGE = (
     "Your last tool call was cut off. Repeat the full <tool_call> block with complete JSON."
 )
-WRITE_NUDGE = (
-    "You have docs but no code yet. Call write_file to create src/main.py now. "
-    "Tool call only — no prose."
-)
 WRITE_SYNTAX_NUDGE = (
-    "Fix the Python and call write_file again. Raw Python only — no markdown fences, "
-    "no leading spaces before top-level lines. Tool call only."
+    "Fix the Python and call write_file again. Raw Python only — no markdown fences. Tool call only."
 )
-RAMBLE_NUDGE = (
-    "Stop explaining. Call write_file, then run_python_sandbox. Tool calls only."
-)
-
-
-def _inject_auto_docs(
-    *,
-    query: str,
-    chat: ChatLayout,
-    messages: list[dict[str, str]],
-    emit: Callable[[AgentStep], None],
-    state: RunState,
-    reason: str,
-) -> str:
-    docs = fetch_cadquery_docs(query)
-    append_event(
-        chat.transcript_path,
-        "auto_docs",
-        query=query,
-        reason=reason,
-        chars=len(docs),
-    )
-    emit(
-        AgentStep(
-            kind="bootstrap",
-            content=summarize_tool_call("search_cadquery_docs", {"query": query}),
-            tool_name="search_cadquery_docs",
-            tool_args={"query": query, "auto": True},
-        )
-    )
-    emit(
-        AgentStep(
-            kind="tool_result",
-            content=docs,
-            tool_name="search_cadquery_docs",
-            tool_args={"query": query},
-        )
-    )
-    message = (
-        f"Auto-fetched CadQuery docs for: {query}\n\n"
-        f"Read these before editing. Use only APIs shown here.\n\n{docs}"
-    )
-    messages.append({"role": "user", "content": message})
-    state.mark_docs_injected()
-    return message
 
 
 @dataclass
@@ -145,6 +90,7 @@ def _write_syntax_failed(output: str) -> bool:
 
 def _force_sandbox_run(
     *,
+    project: ProjectLayout,
     tools_by_name: dict[str, StructuredTool],
     messages: list[dict[str, str]],
     chat: ChatLayout,
@@ -165,7 +111,55 @@ def _force_sandbox_run(
         chat=chat,
         emit=emit,
         record_state=state,
+        project=project,
     )
+
+
+def _inject_review_context(
+    *,
+    project: ProjectLayout,
+    prompt: str,
+    messages: list[dict[str, str]],
+) -> None:
+    try:
+        src = read_file(project.root, "src/main.py")
+    except Exception:  # noqa: BLE001
+        return
+    messages.append(
+        {
+            "role": "user",
+            "content": (
+                "Sandbox passed. Review src/main.py against the user's request.\n\n"
+                f"Request: {prompt}\n\n"
+                f"--- src/main.py ---\n{src}\n---\n\n"
+                "If it matches: brief summary only. If not: fix with tools."
+            ),
+        }
+    )
+
+
+def _auto_sandbox_after_src_edit(
+    *,
+    project: ProjectLayout,
+    prompt: str,
+    tools_by_name: dict[str, StructuredTool],
+    messages: list[dict[str, str]],
+    chat: ChatLayout,
+    emit: Callable[[AgentStep], None],
+    state: RunState,
+) -> None:
+    if not state.needs_sandbox():
+        return
+    output = _force_sandbox_run(
+        project=project,
+        tools_by_name=tools_by_name,
+        messages=messages,
+        chat=chat,
+        emit=emit,
+        state=state,
+    )
+    if not _sandbox_failed(output):
+        _inject_review_context(project=project, prompt=prompt, messages=messages)
 
 
 def run_agent(
@@ -175,7 +169,7 @@ def run_agent(
     *,
     model_id: str | None = None,
     generator: CadGenerator | None = None,
-    max_steps: int = 12,
+    max_steps: int = 15,
     max_tokens: int = 2048,
     on_step: Callable[[AgentStep], None] | None = None,
     generate_fn: GenerateFn | None = None,
@@ -285,64 +279,42 @@ def run_agent(
                 chat=chat,
                 emit=emit,
                 record_state=state,
+                project=project,
             )
-            if call.name == "run_python_sandbox" and _sandbox_failed(output):
-                short, fail_msg, query, docs = build_sandbox_recovery_message(
-                    output,
-                    user_prompt=prompt,
-                )
-                append_event(
-                    chat.transcript_path,
-                    "auto_docs",
-                    query=query,
-                    reason="sandbox_failure",
-                    chars=len(docs),
-                )
-                emit(
-                    AgentStep(
-                        kind="bootstrap",
-                        content=f"auto · {query!r}",
-                        tool_name="search_cadquery_docs",
-                        tool_args={"query": query, "auto": True},
-                    )
-                )
-                emit(
-                    AgentStep(
-                        kind="tool_result",
-                        content=docs,
-                        tool_name="search_cadquery_docs",
-                        tool_args={"query": query},
-                    )
-                )
-                messages.append({"role": "user", "content": fail_msg})
-                append_event(chat.transcript_path, "nudge", content=short)
-                emit(AgentStep(kind="nudge", content=short))
-                state.mark_docs_injected()
-            elif call.name == "search_cadquery_docs" and state.needs_write():
-                messages.append({"role": "user", "content": WRITE_NUDGE})
-                append_event(chat.transcript_path, "nudge", content=WRITE_NUDGE)
-                emit(AgentStep(kind="nudge", content=WRITE_NUDGE))
-            elif call.name in {"write_file", "search_replace"} and _write_syntax_failed(output):
+            if call.name == "run_python_sandbox" and not _sandbox_failed(output):
+                _inject_review_context(project=project, prompt=prompt, messages=messages)
+            if call.name in {"write_file", "search_replace"} and _write_syntax_failed(output):
                 nudge = f"{output}\n\n{WRITE_SYNTAX_NUDGE}"
                 messages.append({"role": "user", "content": nudge})
                 append_event(chat.transcript_path, "nudge", content=WRITE_SYNTAX_NUDGE)
                 emit(AgentStep(kind="nudge", content=WRITE_SYNTAX_NUDGE))
-    else:
-        final_response = "Stopped: reached max agent steps without a final reply."
-        append_event(chat.transcript_path, "assistant", content=final_response, truncated=True)
-        emit(AgentStep(kind="assistant", content=final_response))
 
-    if state.needs_sandbox():
-        sandbox_output = _force_sandbox_run(
+        _auto_sandbox_after_src_edit(
+            project=project,
+            prompt=prompt,
             tools_by_name=tools_by_name,
             messages=messages,
             chat=chat,
             emit=emit,
             state=state,
         )
-        auto_note = f"Auto-ran sandbox.\n{sandbox_output}"
-        final_response = f"{final_response}\n\n{auto_note}" if final_response else auto_note
-        append_event(chat.transcript_path, "assistant", content=auto_note, auto_sandbox=True)
+    else:
+        final_response = "Stopped: reached max agent steps without a final reply."
+        append_event(chat.transcript_path, "assistant", content=final_response, truncated=True)
+        emit(AgentStep(kind="assistant", content=final_response))
+
+    if state.needs_sandbox():
+        _auto_sandbox_after_src_edit(
+            project=project,
+            prompt=prompt,
+            tools_by_name=tools_by_name,
+            messages=messages,
+            chat=chat,
+            emit=emit,
+            state=state,
+        )
+        if not final_response:
+            final_response = "Stopped: reached max agent steps."
 
     run_summary_path = chat.root / f"run_{datetime.now(tz=UTC).strftime('%Y%m%dT%H%M%SZ')}.json"
     summary = {
@@ -393,6 +365,7 @@ def _run_tool_call(
     chat: ChatLayout,
     emit: Callable[[AgentStep], None],
     record_state: RunState | None = None,
+    project: ProjectLayout | None = None,
 ) -> str:
     emit(
         AgentStep(

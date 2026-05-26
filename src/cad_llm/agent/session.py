@@ -15,8 +15,8 @@ class AgentSession:
     project: ProjectLayout
     chat: ChatLayout
     generator: CadGenerator
-    max_steps: int = 12
-    max_tokens: int = 1536
+    max_steps: int = 15
+    max_tokens: int = 2048
     _turn_count: int = field(default=0, repr=False)
     _skill_content: str | None = field(default=None, repr=False)
 
@@ -27,15 +27,17 @@ class AgentSession:
         chat: ChatLayout,
         *,
         model_id: str | None = None,
-        max_steps: int = 12,
-        max_tokens: int = 1536,
+        generator: CadGenerator | None = None,
+        max_steps: int = 15,
+        max_tokens: int = 2048,
     ) -> AgentSession:
-        generator = CadGenerator(model_id=model_id)
-        generator.load()
+        gen = generator or CadGenerator(model_id=model_id)
+        if gen.model is None:
+            gen.load()
         return cls(
             project=project,
             chat=chat,
-            generator=generator,
+            generator=gen,
             max_steps=max_steps,
             max_tokens=max_tokens,
         )

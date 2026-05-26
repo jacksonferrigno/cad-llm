@@ -32,6 +32,7 @@ from cad_llm.app.theme import (
 )
 from cad_llm.app.viewer import CadViewerPanel
 from cad_llm.config import settings
+from cad_llm.inference.generate import CadGenerator
 from cad_llm.tools.workspace import create_chat, create_project, list_projects
 from cad_llm.tools.workspace.project import ChatLayout, ProjectLayout
 
@@ -87,12 +88,22 @@ class CadDesktopApp(ctk.CTk):
         self._project: ProjectLayout | None = None
         self._chat: ChatLayout | None = None
         self._session: AgentSession | None = None
+        self._preloaded: CadGenerator | None = None
         self._busy = False
         self._events: queue.Queue[tuple[str, Any]] = queue.Queue()
 
         self._build_layout()
         self._refresh_projects()
+        threading.Thread(target=self._preload_model, daemon=True).start()
         self.after(100, self._poll_events)
+
+    def _preload_model(self) -> None:
+        try:
+            gen = CadGenerator()
+            gen.load()
+            self._events.put(("model_ready", gen))
+        except Exception as exc:  # noqa: BLE001
+            self._events.put(("model_error", str(exc)))
 
     def _build_layout(self) -> None:
         root = ctk.CTkFrame(self, fg_color=BG, corner_radius=0)
@@ -221,7 +232,10 @@ class CadDesktopApp(ctk.CTk):
         self._transcript.delete("1.0", "end")
         self._transcript.configure(state="disabled")
         self._transcript.append_line(f"project  {project.root}", "system")
-        self._transcript.append_line("Model loads on first prompt.", "system")
+        if self._preloaded is not None:
+            self._transcript.append_line("Model ready.", "system")
+        else:
+            self._transcript.append_line("Loading model…", "system")
         self._viewer.show_mesh_path(latest_mesh(project.outputs_dir))
 
     def _new_project_dialog(self) -> None:
@@ -260,8 +274,14 @@ class CadDesktopApp(ctk.CTk):
 
         try:
             if self._session is None:
-                self._events.put(("status", "Loading model…"))
-                self._session = AgentSession.create(self._project, self._chat)
+                if self._preloaded is None:
+                    self._events.put(("status", "Loading model…"))
+                self._session = AgentSession.create(
+                    self._project,
+                    self._chat,
+                    generator=self._preloaded,
+                )
+                self._preloaded = None
                 self._events.put(("status", "Ready."))
 
             result = self._session.run_turn(prompt, on_step=on_step)
@@ -280,6 +300,11 @@ class CadDesktopApp(ctk.CTk):
                 break
             if kind == "status":
                 self._transcript.append_line(str(payload), "system")
+            elif kind == "model_ready":
+                self._preloaded = payload
+                self._transcript.append_line("Model ready.", "system")
+            elif kind == "model_error":
+                self._transcript.append_line(f"Model load failed: {payload}", "error")
             elif kind == "step":
                 step = payload
                 if step.kind == "assistant":

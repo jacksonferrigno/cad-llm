@@ -372,8 +372,8 @@ def project_run(
         "--model",
         help="MLX model path or Hugging Face repo id (default: settings.mlx_model_id).",
     ),
-    max_steps: int = typer.Option(12, "--max-steps", min=1),
-    max_tokens: int = typer.Option(1536, "--max-tokens", min=64),
+    max_steps: int = typer.Option(15, "--max-steps", min=1),
+    max_tokens: int = typer.Option(2048, "--max-tokens", min=64),
     no_stream: bool = typer.Option(False, "--no-stream", help="Disable token streaming."),
     quiet: bool = typer.Option(False, "--quiet", help="No live output (still writes transcript)."),
 ) -> None:
@@ -426,8 +426,8 @@ def project_chat(
     chat_id: str | None = typer.Option(None, "--chat-id", help="Resume an existing chat."),
     chat_title: str = typer.Option("Interactive session", "--chat-title"),
     model_path: str | None = typer.Option(None, "--model"),
-    max_steps: int = typer.Option(12, "--max-steps", min=1),
-    max_tokens: int = typer.Option(1536, "--max-tokens", min=64),
+    max_steps: int = typer.Option(15, "--max-steps", min=1),
+    max_tokens: int = typer.Option(2048, "--max-tokens", min=64),
     no_stream: bool = typer.Option(False, "--no-stream"),
     quiet: bool = typer.Option(False, "--quiet"),
 ) -> None:
