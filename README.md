@@ -1,79 +1,67 @@
-# Local CAD LLM
+# CAD LLM
 
-Fine-tune a 4B coder model on Apple Silicon to generate CadQuery/build123d from plain English — fully local, no cloud GPU.
+**Vibe-code CAD on your Mac.** Describe a part in plain English, get runnable CadQuery code, a live 3D preview, and an exported STEP file — all locally, no cloud API.
 
-See [overview.md](overview.md) for the full roadmap.
+## Demo
 
-See [docs/AGENT.md](docs/AGENT.md) for how the CAD agent works.
+Prompt: *generate 90mm circular flange, 15mm thick, 30mm square through-hole at center*
 
-## Requirements
+<video src="media/demo.mp4" autoplay loop muted playsinline controls width="100%"></video>
 
-- Apple Silicon Mac (MLX training/inference)
-- macOS 13+
-- [uv](https://docs.astral.sh/uv/) installed
+## What it does
 
-## Setup
+CAD LLM is a local desktop agent for parametric CAD. You chat like you would in a coding assistant, but the output is real geometry:
+
+- **Natural language in** — flanges, brackets, pockets, holes, exports
+- **CadQuery code out** — written to `src/main.py` in a project workspace
+- **Sandbox + self-correction** — runs the script, reads errors, fixes and retries
+- **3D preview** — see the model in the app as soon as it exports
+- **STEP download** — files land in `outputs/` for your CAD workflow
+
+Brainstorming prompts get options and questions first. Build prompts go straight to code.
+
+Everything runs on-device with a local Qwen model via MLX. No API keys, no token billing, no sending your designs to a server.
+
+## Quick start
+
+**Requirements:** Apple Silicon Mac, macOS 13+, [uv](https://docs.astral.sh/uv/)
 
 ```bash
-# Install all deps (core + MLX + CAD + web + dev tools)
+git clone https://github.com/jacksonferrigno/cad-llm.git
+cd cad-llm
+uv sync --extra app
+uv run cad-llm desktop
+```
+
+Or from the CLI:
+
+```bash
+uv run cad-llm project create "my-part"
+uv run cad-llm project run my-part "Build a 50mm cube with a 20mm center hole"
+```
+
+## How it works
+
+1. You describe the part
+2. The agent loads CAD skills + CadQuery doc context
+3. It writes Python, runs it in a sandbox, and fixes failures
+4. On success it exports STEP and shows the result in the preview pane
+
+See [docs/AGENT.md](docs/AGENT.md) for agent architecture and tools.
+
+## Docs
+
+| Doc | What's in it |
+| --- | --- |
+| [docs/AGENT.md](docs/AGENT.md) | Agent loop, tools, desktop app, CLI |
+| [overview.md](overview.md) | Training roadmap, benchmarks, fine-tuning |
+
+## Dev setup
+
+```bash
 uv sync
-
-# Create local data/ and artifacts/ directories
 uv run cad-llm ensure-dirs
-
-# Sanity check
 make verify
 ```
 
-## Project layout
-
-```
-cad-llm/
-├── src/cad_llm/          # Python package
-│   ├── cad/              # CadQuery execution & validation
-│   ├── data/             # scraping & dataset pipeline
-│   ├── eval/             # metrics & benchmarks
-│   ├── inference/        # MLX inference wrappers
-│   └── training/         # SFT & GRPO
-├── scripts/              # one-off utilities
-├── tests/
-├── data/                 # datasets (gitignored)
-└── artifacts/            # models & checkpoints (gitignored)
-```
-
-## Common commands
-
-```bash
-make sync
-uv run cad-llm ensure-dirs
-
-# Training data
-uv run cad-llm data download
-uv run cad-llm data prepare
-
-# Benchmark (Text2CAD-Bench)
-uv run cad-llm bench download
-uv run cad-llm bench run
-```
-
-## Dependency groups
-
-Core dependencies install with `uv sync`. Optional extras are wired into the `dev` group:
-
-
-| Extra | Packages                     | Purpose                 |
-| ----- | ---------------------------- | ----------------------- |
-| `mlx` | mlx-lm, mlx-tune             | inference & fine-tuning |
-| `cad` | cadquery, build123d, trimesh | geometry kernel         |
-| `web` | fastapi, uvicorn             | demo API (Step 8)       |
-
-
-Install a subset without dev tools:
-
-```bash
-uv sync --no-default-groups --extra mlx --extra cad
-```
-
-## Configuration
-
-Copy `.env.example` to `.env` to override defaults (model ID, server host/port, paths).
+Copy `.env.example` to `.env` to override model path, docs DB, and workspace directories.
