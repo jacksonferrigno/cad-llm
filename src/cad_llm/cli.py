@@ -8,7 +8,10 @@ from rich.table import Table
 from cad_llm.config import settings
 from cad_llm.data import bench as bench_data
 from cad_llm.data import text2cadquery
+from cad_llm.docs.index import index_docs
+from cad_llm.docs.search import search_cadquery_docs
 from cad_llm.eval.bench import default_output_path, run_bench, save_report
+from cad_llm.inference.generate import CadGenerator, resolve_model_id
 from cad_llm.training.sft import DEFAULT_DATA, DEFAULT_OUTPUT, run_sft
 
 app = typer.Typer(
@@ -21,9 +24,11 @@ console = Console()
 data_app = typer.Typer(help="Download and prepare training data.")
 bench_app = typer.Typer(help="Text2CAD-Bench evaluation.")
 train_app = typer.Typer(help="Model training.")
+docs_app = typer.Typer(help="CadQuery documentation RAG (LangChain + pgvector).")
 app.add_typer(data_app, name="data")
 app.add_typer(bench_app, name="bench")
 app.add_typer(train_app, name="train")
+app.add_typer(docs_app, name="docs")
 
 DEFAULT_BENCH_PROMPTS = bench_data.default_prompts_path(
     settings.resolve(settings.text2cad_bench_dir)
@@ -109,6 +114,11 @@ def bench_run(
         "--prompts",
         help="Text2CAD-Bench release.csv",
     ),
+    model_path: str | None = typer.Option(
+        None,
+        "--model",
+        help="MLX model path or Hugging Face repo id (default: settings.mlx_model_id)",
+    ),
     output_path: Path | None = typer.Option(None, "--output"),
     limit: int | None = typer.Option(None, "--limit", min=1),
     max_tokens: int = typer.Option(512, "--max-tokens", min=16),
@@ -120,7 +130,13 @@ def bench_run(
         prompts = prompts[:limit]
 
     console.print(f"[bold]Text2CAD-Bench[/bold] — {len(prompts)} prompts")
-    report = run_bench(prompts, max_tokens=max_tokens, verbose=verbose)
+    if model_path:
+        resolved_model = resolve_model_id(model_path)
+        console.print(f"  model:  {resolved_model}")
+        generator = CadGenerator(model_id=resolved_model)
+    else:
+        generator = None
+    report = run_bench(prompts, generator=generator, max_tokens=max_tokens, verbose=verbose)
     destination = output_path or default_output_path()
     save_report(report, destination)
 
@@ -167,6 +183,45 @@ def train_sft(
 
     adapter_path = run_sft(data_path, output_dir, max_samples=max_samples)
     console.print(f"\n[green]Done.[/green] Adapters saved to [cyan]{adapter_path}[/cyan]")
+
+
+@docs_app.command("index")
+def docs_index(
+    html_path: Path | None = typer.Option(None, "--html"),
+    reset: bool = typer.Option(True, "--reset/--no-reset"),
+) -> None:
+    """Chunk CadQuery HTML with LangChain and index into pgvector."""
+    resolved_html = html_path or settings.resolve(settings.cadquery_docs_dir) / "index.html"
+    summary = index_docs(
+        resolved_html,
+        settings.docs_db_url,
+        collection_name=settings.docs_collection_name,
+        embedding_model=settings.docs_embedding_model,
+        chunks_cache=settings.resolve(settings.docs_chunks_cache),
+        reset=reset,
+    )
+    console.print("[bold]CadQuery docs indexed[/bold]")
+    console.print(f"  html:       {summary.html_path}")
+    console.print(f"  chunks:     {summary.chunks}")
+    console.print(f"  collection: {summary.collection_name}")
+    console.print(f"  cache:      {summary.chunks_cache}")
+
+
+@docs_app.command("search")
+def docs_search(
+    query: str,
+    limit: int = typer.Option(5, "--limit", min=1),
+) -> None:
+    """Hybrid search (PGVector + BM25) over indexed CadQuery docs."""
+    result = search_cadquery_docs(
+        query,
+        db_url=settings.docs_db_url,
+        collection_name=settings.docs_collection_name,
+        embedding_model=settings.docs_embedding_model,
+        chunks_cache=settings.resolve(settings.docs_chunks_cache),
+        limit=limit,
+    )
+    console.print(result)
 
 
 def main() -> None:

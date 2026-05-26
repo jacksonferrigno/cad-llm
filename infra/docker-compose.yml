@@ -1,0 +1,20 @@
+services:
+  cadllm-docs-db:
+    image: pgvector/pgvector:pg16
+    container_name: cadllm-docs-db
+    environment:
+      POSTGRES_USER: cadllm
+      POSTGRES_PASSWORD: cadllm
+      POSTGRES_DB: cadllm
+    ports:
+      - "5433:5432"
+    volumes:
+      - cadllm_docs_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cadllm -d cadllm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cadllm_docs_pgdata:

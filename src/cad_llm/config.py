@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     checkpoints_dir: Path = Path("artifacts/checkpoints")
     text2cadquery_dir: Path = Path("data/text2cadquery")
     text2cad_bench_dir: Path = Path("data/text2cad_bench")
+    cadquery_docs_dir: Path = Path("data/cadquery-latest")
+    docs_db_url: str = "postgresql://cadllm:cadllm@127.0.0.1:5433/cadllm"
+    docs_collection_name: str = "cadquery_docs"
+    docs_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    docs_chunks_cache: Path = Path("artifacts/docs/cadquery_chunks.pkl")
 
     # Vertex managed tuning: qwen/qwen3@qwen3-4b → Qwen/Qwen3-4B on Hugging Face.
     vertex_base_model: str = "qwen/qwen3@qwen3-4b"
