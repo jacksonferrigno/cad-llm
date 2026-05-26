@@ -20,7 +20,7 @@ CAD LLM is a local desktop agent for parametric CAD. You chat like you would in 
 
 Brainstorming prompts get options and questions first. Build prompts go straight to code.
 
-Everything runs on-device with a local Qwen model via MLX. No API keys, no token billing, no sending your designs to a server.
+Everything runs on-device with **[Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B)** via MLX on Apple Silicon. No API keys, no token billing, no sending your designs to a server.
 
 ## Quick start
 
@@ -64,4 +64,4 @@ uv run cad-llm ensure-dirs
 make verify
 ```
 
-Copy `.env.example` to `.env` to override model path, docs DB, and workspace directories.
+Copy `.env.example` to `.env` to override the model (`MLX_MODEL_ID`, default `Qwen/Qwen3.5-4B`), docs DB, and workspace directories.

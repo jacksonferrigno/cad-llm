@@ -4,13 +4,19 @@ A local agent that turns plain-English CAD requests into runnable CadQuery proje
 
 ## Model
 
-The agent uses a 4-billion-parameter Qwen3.5 model for CAD generation. Inference runs locally on Apple Silicon. The model loads once per session and stays in memory for follow-up prompts.
+The agent uses **[Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B)** — a 4-billion-parameter base model loaded through MLX on Apple Silicon. The model loads once per session and stays in memory for follow-up prompts.
 
-Default model path: `Qwen/Qwen3.5-4B`.
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `MLX_MODEL_ID` | `Qwen/Qwen3.5-4B` | Local inference model |
+| `HF_MODEL_ID` | `Qwen/Qwen3.5-4B` | Hugging Face base model id |
+| `VERTEX_BASE_MODEL` | `Qwen/Qwen3.5-4B` | Vertex managed tuning base |
+
+Override in `.env` or pass `--model` to the CLI. Fine-tuned checkpoints can be pointed at a local MLX adapter path under `artifacts/models/`.
 
 ## What it does
 
-You describe a part in natural language. The agent researches CadQuery APIs, writes Python source, executes it in a sandbox, fixes failures, exports STEP or STL to `outputs/`, and shows the result in the desktop preview.
+You describe a part in natural language. The agent loads CadQuery doc context, writes Python source, executes it in a sandbox, fixes failures, exports STEP or STL to `outputs/`, and shows the result in the desktop preview.
 
 For vague or brainstorming prompts, the agent replies with options and questions only. It does not write code until you ask for a build.
 
@@ -137,4 +143,4 @@ All optional groups install via `uv sync`. Doc search requires `docker compose u
 
 ## Configuration
 
-Environment variables and defaults live in `src/cad_llm/config.py`. Override model path, docs database URL, and project directories through `.env`.
+Environment variables and defaults live in `src/cad_llm/config.py`. Set `MLX_MODEL_ID=Qwen/Qwen3.5-4B` in `.env` to change the inference model, or override docs database URL and project directories there.

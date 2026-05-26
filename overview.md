@@ -1,12 +1,13 @@
 # Local CAD LLM — Project Roadmap
 
 ## The pitch
-4B parameter model that generates engineering CAD from plain English. 
+4B parameter model that generates engineering CAD from plain English.
 
 ---
 
 ## Stack
-- **Model:** [Qwen/Qwen3-4B](https://huggingface.co/Qwen/Qwen3-4B) (Vertex managed tuning: `qwen/qwen3@qwen3-4b`) → [mlx-community/Qwen3-4B-4bit](https://huggingface.co/mlx-community/Qwen3-4B-4bit) (local inference)
+- **Model (current default):** [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) via MLX on Apple Silicon
+- **Training target:** same base on Vertex managed tuning, then optional MLX LoRA / GRPO checkpoints under `artifacts/models/`
 - **Training:** mlx-tune (Apple MLX, LoRA → GRPO)
 - **Training data:** Text-to-CadQuery (~170k text + CadQuery pairs)
 - **CAD kernel:** CadQuery + build123d (Python, OpenCascade)
@@ -20,7 +21,7 @@
 
 ### Step 1 — Environment setup ✅
 - Install mlx-tune, CadQuery, build123d
-- Load Qwen3-4B via mlx_lm
+- Load Qwen3.5-4B via mlx_lm
 - Verify inference works at usable speed on 48GB Mac
 
 ### Step 2 — Baseline (Text2CAD-Bench)
