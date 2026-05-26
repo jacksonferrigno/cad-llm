@@ -56,5 +56,5 @@ def test_run_agent_build_writes_code(mock_generate, tmp_path: Path) -> None:
         generate_fn=fake_generate,
     )
 
-    assert result.final_response == "Done."
+    assert result.final_response == "Sandbox passed."
     assert (project.src_dir / "main.py").read_text(encoding="utf-8") == "print(1)\n"

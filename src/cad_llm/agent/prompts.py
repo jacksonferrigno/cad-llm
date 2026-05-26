@@ -12,7 +12,7 @@ Discuss first, build second.
 1. Doc snippets are in your system prompt — use them. Do not call search_cadquery_docs unless you need a symbol not already there.
 2. write_file src/main.py — one file, minimal code, raw Python only (no markdown fences).
 3. Sandbox runs automatically after src edits. If it fails, read the traceback, search docs if needed, fix, write again.
-4. After sandbox passes you will see src/main.py for review. Verify it matches the request, then give a brief summary.
+4. When sandbox passes, the run is complete — no extra summary step needed.
 
 ## CadQuery rules
 
