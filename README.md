@@ -5,6 +5,7 @@
 ## Demo
 
 Prompt: *generate a 80×80×40mm block with 20mm radius hemispherical pocket on top face*
+![Demo](media/demo1.gif)
 
 
 
