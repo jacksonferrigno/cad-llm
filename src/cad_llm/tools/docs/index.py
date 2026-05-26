@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from cad_llm.docs.loader import load_and_split_html, save_chunks_cache
-from cad_llm.docs.store import build_vectorstore
+from cad_llm.tools.docs.loader import load_and_split_html, save_chunks_cache
+from cad_llm.tools.docs.store import build_vectorstore
 
 
 @dataclass(frozen=True)

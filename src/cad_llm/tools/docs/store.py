@@ -2,18 +2,26 @@
 
 from __future__ import annotations
 
+from langchain_classic.retrievers import EnsembleRetriever
 from langchain_community.embeddings import FastEmbedEmbeddings
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from langchain_postgres.vectorstores import PGVector
-from langchain_classic.retrievers import EnsembleRetriever
 
-from cad_llm.docs.loader import langchain_db_url
+from cad_llm.tools.docs.loader import langchain_db_url
+
+
+_embedding_cache: dict[str, FastEmbedEmbeddings] = {}
 
 
 def build_embeddings(model_name: str) -> FastEmbedEmbeddings:
-    return FastEmbedEmbeddings(model_name=model_name)
+    cached = _embedding_cache.get(model_name)
+    if cached is not None:
+        return cached
+    embeddings = FastEmbedEmbeddings(model_name=model_name)
+    _embedding_cache[model_name] = embeddings
+    return embeddings
 
 
 def build_vectorstore(
@@ -40,7 +48,6 @@ def build_hybrid_retriever(
     vector_weight: float = 0.6,
     keyword_weight: float = 0.4,
 ) -> BaseRetriever:
-    """Vector search + BM25 with keyword/symbol boosting via ensemble."""
     bm25 = BM25Retriever.from_documents(chunks)
     bm25.k = k
     vector = vectorstore.as_retriever(search_kwargs={"k": k})

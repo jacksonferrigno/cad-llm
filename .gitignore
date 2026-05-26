@@ -217,9 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Project-local runtime data and model artifacts
-data/
-artifacts/
+# Project-local runtime data and model artifacts (repo root only)
+/data/
+/artifacts/
+/workspace/
 
 # Generated geometry during eval
 *.step

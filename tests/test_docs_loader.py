@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from cad_llm.docs.loader import extract_symbols, load_and_split_html
+from cad_llm.tools.docs.loader import extract_symbols, load_and_split_html
 
 
 def test_load_and_split_cadquery_html() -> None:

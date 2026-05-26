@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     artifacts_dir: Path = Path("artifacts")
     models_dir: Path = Path("artifacts/models")
     checkpoints_dir: Path = Path("artifacts/checkpoints")
+    workspace_dir: Path = Path("workspace")
+    projects_dir: Path = Path("workspace/projects")
     text2cadquery_dir: Path = Path("data/text2cadquery")
     text2cad_bench_dir: Path = Path("data/text2cad_bench")
     cadquery_docs_dir: Path = Path("data/cadquery-latest")

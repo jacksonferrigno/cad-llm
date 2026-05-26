@@ -1,4 +1,8 @@
-from cad_llm.inference.extract import extract_python_code
+from cad_llm.inference.extract import (
+    ReasoningStream,
+    extract_python_code,
+    extract_reasoning_text,
+)
 
 
 def test_extract_fenced_python() -> None:
@@ -38,6 +42,21 @@ def test_extract_strips_thinking_block() -> None:
     code = extract_python_code(text)
     assert code.startswith("import cadquery")
     assert "Plan the hex" not in code
+
+
+def test_extract_reasoning_from_thinking_block() -> None:
+    raw = "<think>\nPlan the cube.\n</think>\n<tool_call>{}\n"
+    assert extract_reasoning_text(raw) == "Plan the cube."
+
+
+def test_reasoning_stream_incremental() -> None:
+    stream = ReasoningStream()
+    parts: list[str] = []
+    for token in ("<think>\n", "Plan ", "cube", "</think>"):
+        delta = stream.feed(token)
+        if delta:
+            parts.append(delta)
+    assert "".join(parts) == "Plan cube"
 
 
 def test_extract_strips_leading_thinking_close() -> None:
