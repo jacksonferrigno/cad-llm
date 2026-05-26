@@ -25,6 +25,7 @@ cad = [
     "build123d>=0.8.0",
     "numpy>=2.0.0",
     "trimesh>=4.0.0",
+    "cascadio>=0.0.13",
 ]
 web = [
     "fastapi>=0.115.0",
@@ -40,13 +41,18 @@ docs = [
     "rank-bm25>=0.2.2",
     "sqlalchemy>=2.0.0",
 ]
+app = [
+    "customtkinter>=5.2.0",
+    "matplotlib>=3.8.0",
+]
 
 [project.scripts]
 cad-llm = "cad_llm.cli:app"
+cad-llm-desktop = "cad_llm.app.window:run"
 
 [dependency-groups]
 dev = [
-    "cad-llm[cad,mlx,web,docs]",
+    "cad-llm[cad,mlx,web,docs,app]",
     "mypy>=1.14.0",
     "pytest>=8.3.0",
     "pytest-cov>=6.0.0",

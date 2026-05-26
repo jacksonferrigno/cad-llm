@@ -15,12 +15,18 @@ def test_bootstrap_loads_skill_and_docs(tmp_path) -> None:
     ):
         prompt, steps, skill = bootstrap_system_prompt("Build a cube", chat)
 
-    assert "cad-generation skill" in prompt
+    assert "## Skills" in prompt
+    assert "## cad-generation" in prompt
+    assert "## brainstorming" in prompt
+    assert "Discuss first, build second" in prompt
     assert "Workplane extrude example" in prompt
     assert skill
-    assert len(steps) == 2
+    assert len(steps) == 3
     assert steps[0].tool_name == "load_skill"
-    assert steps[1].tool_name == "search_cadquery_docs"
+    assert steps[0].tool_args == {"name": "cad-generation"}
+    assert steps[1].tool_name == "load_skill"
+    assert steps[1].tool_args == {"name": "brainstorming"}
+    assert steps[2].tool_name == "search_cadquery_docs"
 
 
 def test_bootstrap_skips_docs_when_cached(tmp_path) -> None:

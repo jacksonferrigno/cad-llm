@@ -9,6 +9,7 @@ from pathlib import Path
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
+from cad_llm.inference.extract import extract_python_code
 from cad_llm.tools.common.paths import resolve_project_path
 
 
@@ -53,6 +54,35 @@ def grep(project_root: Path, pattern: str, path: str | None = None) -> str:
     return "\n".join(out) if out else ""
 
 
+def _is_interactive_show_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped or stripped.startswith("#"):
+        return False
+    if stripped.startswith(("cq.show(", "show_object(")):
+        return True
+    return "Viewer(" in stripped and ".show(" in stripped
+
+
+def _sanitize_python_content(content: str) -> str:
+    """Normalize common model mistakes before syntax validation."""
+    if "```" in content:
+        content = extract_python_code(content)
+
+    lines = [line.rstrip() for line in content.replace("\r\n", "\n").splitlines()]
+    fixed: list[str] = []
+    for line in lines:
+        if _is_interactive_show_line(line):
+            continue
+        # Markdown/code-block leaks often prefix top-level lines with a single space.
+        if line.startswith(" ") and not line.startswith("  ") and line.strip():
+            fixed.append(line[1:])
+        else:
+            fixed.append(line)
+
+    text = "\n".join(fixed).strip()
+    return f"{text}\n" if text else ""
+
+
 def _validate_python(content: str, *, path: str) -> str | None:
     if not path.endswith(".py"):
         return None
@@ -64,6 +94,9 @@ def _validate_python(content: str, *, path: str) -> str | None:
 
 
 def write_file(project_root: Path, path: str, content: str) -> str:
+    if path.endswith(".py"):
+        content = _sanitize_python_content(content)
+
     syntax_error = _validate_python(content, path=path)
     if syntax_error is not None:
         return syntax_error
@@ -80,6 +113,8 @@ def search_replace(project_root: Path, path: str, old: str, new: str) -> str:
     if old not in text:
         return "no_match"
     updated = text.replace(old, new)
+    if path.endswith(".py"):
+        updated = _sanitize_python_content(updated)
     syntax_error = _validate_python(updated, path=path)
     if syntax_error is not None:
         return syntax_error

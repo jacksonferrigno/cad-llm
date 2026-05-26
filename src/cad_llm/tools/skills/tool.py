@@ -11,7 +11,7 @@ from cad_llm.tools.skills.loader import load_skill
 class LoadSkillInput(BaseModel):
     name: str = Field(
         description=(
-            "Skill id to load (e.g. cad-generation, cad-debug); "
+            "Skill id to load (e.g. cad-generation, brainstorming, cad-debug); "
             "matches a file under cad_llm/tools/skills/{name}.md."
         ),
     )
@@ -27,7 +27,7 @@ def get_skill_tool() -> StructuredTool:
         name="load_skill",
         description=(
             "Load Markdown guidance for a named skill "
-            "(multi-file CAD layout, debugging workflow after sandbox failures)."
+            "(cad-generation, brainstorming, cad-debug)."
         ),
         args_schema=LoadSkillInput,
     )

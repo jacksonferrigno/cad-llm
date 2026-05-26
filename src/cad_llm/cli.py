@@ -51,7 +51,7 @@ def _agent_callbacks(
     quiet: bool,
     no_stream: bool,
 ) -> tuple[Callable[[AgentStep], None] | None, Callable[..., str] | None]:
-    agent_console = AgentConsole(console, stream=not no_stream and not quiet)
+    agent_console = AgentConsole(console, stream=not no_stream and not quiet, show_reasoning=False)
 
     def on_step(step: AgentStep) -> None:
         if not quiet:
@@ -60,18 +60,7 @@ def _agent_callbacks(
     def wrapped_generate(model, tokenizer, prompt, max_tokens):  # noqa: ANN001
         from cad_llm.agent.generate import generate_completion
 
-        if no_stream:
-            return generate_completion(model, tokenizer, prompt, max_tokens)
-        agent_console.begin_generation()
-        text = generate_completion(
-            model,
-            tokenizer,
-            prompt,
-            max_tokens,
-            on_token=agent_console.on_token,
-        )
-        agent_console.end_generation()
-        return text
+        return generate_completion(model, tokenizer, prompt, max_tokens)
 
     return (on_step if not quiet else None, wrapped_generate if not quiet else None)
 
@@ -104,6 +93,18 @@ def _run_project_turn(
         on_step=on_step,
         generate_fn=generate_fn,
     )
+
+
+@app.command()
+def desktop() -> None:
+    """Launch native desktop shell (terminal chat + CAD preview)."""
+    try:
+        from cad_llm.app.window import run
+    except ImportError as exc:
+        raise typer.BadParameter(
+            "Desktop UI dependencies missing. Run: uv sync --extra app"
+        ) from exc
+    run()
 
 
 @app.command()

@@ -77,6 +77,46 @@ def test_write_file_rejects_invalid_python(project_root: Path) -> None:
     assert not (project_root / "src" / "main.py").exists()
 
 
+def test_write_file_fixes_stray_single_space_indent(project_root: Path) -> None:
+    content = (
+        'import cadquery as cq\n\n'
+        'result = cq.Workplane("XY").box(10, 10, 10)\n\n'
+        ' cq.exporters.export(result, "outputs/cube.step")\n'
+    )
+    rel = write_file(project_root, "src/main.py", content)
+    assert rel == "src/main.py"
+    saved = (project_root / "src" / "main.py").read_text()
+    assert ' cq.exporters.export' not in saved
+    assert 'cq.exporters.export(result, "outputs/cube.step")' in saved
+
+
+def test_write_file_strips_markdown_fences(project_root: Path) -> None:
+    content = """```python
+import cadquery as cq
+result = cq.Workplane("XY").box(1, 1, 1)
+```"""
+    rel = write_file(project_root, "src/main.py", content)
+    assert rel == "src/main.py"
+    saved = (project_root / "src" / "main.py").read_text()
+    assert "```" not in saved
+    assert "import cadquery as cq" in saved
+
+
+def test_write_file_strips_show_calls(project_root: Path) -> None:
+    content = (
+        "import cadquery as cq\n\n"
+        "result = cq.Workplane(\"XY\").box(1, 1, 1)\n"
+        "cq.exporters.export(result, \"outputs/x.step\")\n"
+        "cq.show(result)\n"
+        "cq.Viewer().show(result)\n"
+    )
+    rel = write_file(project_root, "src/main.py", content)
+    assert rel == "src/main.py"
+    saved = (project_root / "src" / "main.py").read_text()
+    assert "cq.show" not in saved
+    assert "Viewer" not in saved
+
+
 def test_get_edit_tools_exports(project_root: Path) -> None:
     tools = get_edit_tools()
     names = {t.name for t in tools}

@@ -38,6 +38,10 @@ WRITE_NUDGE = (
     "You have docs but no code yet. Call write_file to create src/main.py now. "
     "Tool call only — no prose."
 )
+WRITE_SYNTAX_NUDGE = (
+    "Fix the Python and call write_file again. Raw Python only — no markdown fences, "
+    "no leading spaces before top-level lines. Tool call only."
+)
 RAMBLE_NUDGE = (
     "Stop explaining. Call write_file, then run_python_sandbox. Tool calls only."
 )
@@ -135,6 +139,10 @@ def _sandbox_failed(output: str) -> bool:
     return first.startswith("exit_code=") and not first.startswith("exit_code=0")
 
 
+def _write_syntax_failed(output: str) -> bool:
+    return output.startswith("error: Python syntax error")
+
+
 def _force_sandbox_run(
     *,
     tools_by_name: dict[str, StructuredTool],
@@ -226,7 +234,7 @@ def run_agent(
             tools=openai_tools,
             tokenize=False,
             add_generation_prompt=True,
-            enable_thinking=True,
+            enable_thinking=False,
         )
 
         if generate_fn is not None:
@@ -247,20 +255,6 @@ def run_agent(
         if not tool_calls:
             visible = strip_model_response(raw)
 
-            if state.needs_write():
-                messages.append({"role": "assistant", "content": raw})
-                append_event(
-                    chat.transcript_path,
-                    "assistant",
-                    content=raw,
-                    rejected=True,
-                    reason="no_src_write",
-                )
-                messages.append({"role": "user", "content": WRITE_NUDGE})
-                append_event(chat.transcript_path, "nudge", content=WRITE_NUDGE)
-                emit(AgentStep(kind="nudge", content=WRITE_NUDGE))
-                continue
-
             if state.needs_sandbox():
                 messages.append({"role": "assistant", "content": raw})
                 append_event(
@@ -270,16 +264,6 @@ def run_agent(
                     rejected=True,
                     reason="sandbox_not_run",
                 )
-                if not state.docs_injected_for_dirty_src:
-                    query = docs_query_from_failure("", user_prompt=prompt)
-                    _inject_auto_docs(
-                        query=query,
-                        chat=chat,
-                        messages=messages,
-                        emit=emit,
-                        state=state,
-                        reason="sandbox_not_run",
-                    )
                 messages.append({"role": "user", "content": SANDBOX_NUDGE})
                 append_event(chat.transcript_path, "nudge", content=SANDBOX_NUDGE)
                 emit(AgentStep(kind="nudge", content=SANDBOX_NUDGE))
@@ -338,6 +322,11 @@ def run_agent(
                 messages.append({"role": "user", "content": WRITE_NUDGE})
                 append_event(chat.transcript_path, "nudge", content=WRITE_NUDGE)
                 emit(AgentStep(kind="nudge", content=WRITE_NUDGE))
+            elif call.name in {"write_file", "search_replace"} and _write_syntax_failed(output):
+                nudge = f"{output}\n\n{WRITE_SYNTAX_NUDGE}"
+                messages.append({"role": "user", "content": nudge})
+                append_event(chat.transcript_path, "nudge", content=WRITE_SYNTAX_NUDGE)
+                emit(AgentStep(kind="nudge", content=WRITE_SYNTAX_NUDGE))
     else:
         final_response = "Stopped: reached max agent steps without a final reply."
         append_event(chat.transcript_path, "assistant", content=final_response, truncated=True)

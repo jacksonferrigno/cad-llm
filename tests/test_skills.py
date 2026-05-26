@@ -6,6 +6,7 @@ from cad_llm.tools.skills.loader import list_skills, load_skill
 def test_list_skills_includes_builtins() -> None:
     names = list_skills()
     assert "cad-generation" in names
+    assert "brainstorming" in names
     assert "cad-debug" in names
 
 
@@ -13,6 +14,12 @@ def test_load_skill_cad_generation() -> None:
     content = load_skill("cad-generation")
     assert "# CAD generation" in content
     assert "search_cadquery_docs" in content
+
+
+def test_load_skill_brainstorming() -> None:
+    content = load_skill("brainstorming")
+    assert "# Brainstorming" in content
+    assert "Do not call tools" in content
 
 
 def test_load_skill_cad_debug() -> None:

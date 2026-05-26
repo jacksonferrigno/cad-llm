@@ -15,3 +15,8 @@ Before using **unfamiliar CadQuery APIs** or patterns you have not used confiden
 1. Call **`search_cadquery_docs`** with a focused query (symbol, error message, or behavior).
 2. Use ONLY API names and patterns from the returned snippets — never guess.
 3. After sandbox errors, read the auto-fetched doc snippets before editing again.
+
+## Export only
+
+- Export meshes to `outputs/` with `cq.exporters.export(result, "outputs/name.step")`.
+- Do **not** call `cq.show`, `show_object`, or `cq.Viewer` — the desktop app previews exports.

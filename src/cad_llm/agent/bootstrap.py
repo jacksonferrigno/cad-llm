@@ -10,6 +10,13 @@ from cad_llm.tools.docs.search import search_cadquery_docs
 from cad_llm.tools.skills.loader import load_skill
 from cad_llm.tools.workspace.project import ChatLayout
 
+_BOOTSTRAP_SKILLS = ("cad-generation", "brainstorming")
+
+
+def _load_bootstrap_skills() -> str:
+    sections = [f"## {name}\n\n{load_skill(name).strip()}" for name in _BOOTSTRAP_SKILLS]
+    return "\n\n".join(sections)
+
 
 def bootstrap_system_prompt(
     prompt: str,
@@ -23,17 +30,23 @@ def bootstrap_system_prompt(
     steps: list[AgentStep] = []
 
     if include_skill or cached_skill is None:
-        skill_content = load_skill("cad-generation")
+        skill_content = _load_bootstrap_skills()
         if include_skill:
-            append_event(chat.transcript_path, "bootstrap", name="load_skill", skill="cad-generation")
-            steps.append(
-                AgentStep(
-                    kind="bootstrap",
-                    content="ready",
-                    tool_name="load_skill",
-                    tool_args={"name": "cad-generation"},
+            for skill_name in _BOOTSTRAP_SKILLS:
+                append_event(
+                    chat.transcript_path,
+                    "bootstrap",
+                    name="load_skill",
+                    skill=skill_name,
                 )
-            )
+                steps.append(
+                    AgentStep(
+                        kind="bootstrap",
+                        content="ready",
+                        tool_name="load_skill",
+                        tool_args={"name": skill_name},
+                    )
+                )
     else:
         skill_content = cached_skill
 
