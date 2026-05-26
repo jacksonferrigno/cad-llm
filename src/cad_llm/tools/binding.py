@@ -50,6 +50,22 @@ class RunPythonBoundInput(BaseModel):
     timeout: int = Field(default=30, description="Subprocess timeout in seconds.")
 
 
+def get_bound_research_tools(_project_root: Path) -> list[StructuredTool]:
+    return [get_search_cadquery_docs_tool()]
+
+
+def get_bound_implement_tools(project_root: Path) -> list[StructuredTool]:
+    names = {
+        "read_file",
+        "grep",
+        "write_file",
+        "search_replace",
+        "delete_file",
+        "run_python_sandbox",
+    }
+    return [tool for tool in get_bound_agent_tools(project_root) if tool.name in names]
+
+
 def get_bound_agent_tools(project_root: Path) -> list[StructuredTool]:
     """Return agent tools with ``project_root`` fixed to the active workspace."""
     root = project_root.resolve()

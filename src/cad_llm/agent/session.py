@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from cad_llm.agent.runner import AgentRunResult, GenerateFn, run_agent
+from cad_llm.agent.orchestrator import run_orchestrated_agent
+from cad_llm.agent.runner import AgentRunResult, GenerateFn
 from cad_llm.inference.generate import CadGenerator
 from cad_llm.tools.workspace.project import ChatLayout, ProjectLayout
 
@@ -18,7 +19,6 @@ class AgentSession:
     max_steps: int = 15
     max_tokens: int = 2048
     _turn_count: int = field(default=0, repr=False)
-    _skill_content: str | None = field(default=None, repr=False)
 
     @classmethod
     def create(
@@ -49,10 +49,9 @@ class AgentSession:
         on_step: Any = None,
         generate_fn: GenerateFn | None = None,
     ) -> AgentRunResult:
-        first_turn = self._turn_count == 0
         self._turn_count += 1
 
-        result = run_agent(
+        return run_orchestrated_agent(
             self.project,
             self.chat,
             prompt,
@@ -60,12 +59,5 @@ class AgentSession:
             max_tokens=self.max_tokens,
             on_step=on_step,
             generate_fn=generate_fn,
-            bootstrap=True,
-            bootstrap_docs=first_turn,
-            bootstrap_skill=first_turn,
-            cached_skill=self._skill_content,
             generator=self.generator,
         )
-        if result.skill_content:
-            self._skill_content = result.skill_content
-        return result

@@ -29,6 +29,11 @@ def format_assistant_reply(text: str, *, max_chars: int = 480) -> str:
 
 def format_step(step: AgentStep) -> tuple[str, str]:
     """Return (tag, line) for the transcript pane. tag drives color."""
+    prefix = f"{step.phase} › " if step.phase and step.phase != "orchestrator" else ""
+
+    if step.kind == "phase":
+        return "setup", f"setup  {step.content}"
+
     if step.kind == "bootstrap":
         label = "skill" if step.tool_name == "load_skill" else "docs"
         auto = (step.tool_args or {}).get("auto")
@@ -38,21 +43,22 @@ def format_step(step: AgentStep) -> tuple[str, str]:
     if step.kind == "tool_call":
         assert step.tool_name is not None
         summary = summarize_tool_call(step.tool_name, step.tool_args or {})
-        return "tool_out", f"→ {summary}"
+        return "tool_out", f"{prefix}→ {summary}"
 
     if step.kind == "tool_result":
         assert step.tool_name is not None
         summary = summarize_tool_result(step.tool_name, step.content)
         failed = "error" in summary.lower() or "exit_code=1" in summary
-        return "error" if failed else "tool_in", f"← {summary}"
+        return "error" if failed else "tool_in", f"{prefix}← {summary}"
 
     if step.kind == "nudge":
-        return "nudge", f"… {step.content[:100]}"
+        return "nudge", f"… {prefix}{step.content[:100]}"
 
     if step.kind == "assistant":
         text = format_assistant_reply(step.content)
         if text:
-            return "done", text
+            label = prefix.rstrip(" › ") or "agent"
+            return "done", f"{label} › {text}" if prefix else text
         return "muted", ""
 
     if step.content:

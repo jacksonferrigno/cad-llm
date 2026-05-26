@@ -7,7 +7,8 @@ from rich.console import Console
 from rich.table import Table
 
 from cad_llm.agent.display import AgentConsole, print_paths
-from cad_llm.agent.runner import AgentRunResult, run_agent
+from cad_llm.agent.orchestrator import run_orchestrated_agent
+from cad_llm.agent.runner import AgentRunResult
 from cad_llm.agent.session import AgentSession
 from cad_llm.agent.steps import AgentStep
 from cad_llm.config import settings
@@ -83,7 +84,7 @@ def _run_project_turn(
     if session is not None:
         return session.run_turn(prompt, on_step=on_step, generate_fn=generate_fn)
 
-    return run_agent(
+    return run_orchestrated_agent(
         project,
         chat,
         prompt,

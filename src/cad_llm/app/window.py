@@ -19,7 +19,9 @@ from cad_llm.app.theme import (
     AGENT,
     BG,
     BORDER,
+    DIVIDER,
     ERROR,
+    FONT_LABEL,
     FONT_MONO,
     FONT_TITLE,
     FONT_UI,
@@ -27,6 +29,8 @@ from cad_llm.app.theme import (
     OK,
     PANEL,
     SIDEBAR,
+    SUBTLE,
+    SURFACE,
     TEXT,
     USER,
 )
@@ -110,72 +114,126 @@ class CadDesktopApp(ctk.CTk):
         root.pack(fill="both", expand=True)
 
         # Sidebar
-        sidebar = ctk.CTkFrame(root, width=200, fg_color=SIDEBAR, corner_radius=0)
+        sidebar = ctk.CTkFrame(root, width=220, fg_color=SIDEBAR, corner_radius=0)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
 
+        brand = ctk.CTkFrame(sidebar, fg_color=SIDEBAR, corner_radius=0, height=44)
+        brand.pack(fill="x", padx=18, pady=(18, 8))
+        brand.pack_propagate(False)
+        ctk.CTkLabel(
+            brand,
+            text="cad-llm",
+            font=("SF Pro Text", 14, "bold"),
+            text_color=TEXT,
+            anchor="w",
+        ).pack(side="left")
+
         ctk.CTkLabel(
             sidebar,
-            text="PROJECTS",
-            font=FONT_TITLE,
-            text_color=ACCENT,
+            text="projects",
+            font=FONT_LABEL,
+            text_color=MUTED,
             anchor="w",
-        ).pack(fill="x", padx=14, pady=(14, 8))
+        ).pack(fill="x", padx=18, pady=(8, 4))
 
-        self._project_list = ctk.CTkScrollableFrame(sidebar, fg_color=SIDEBAR, corner_radius=0)
-        self._project_list.pack(fill="both", expand=True, padx=6, pady=(0, 8))
+        self._project_list = ctk.CTkScrollableFrame(
+            sidebar, fg_color=SIDEBAR, corner_radius=0
+        )
+        self._project_list.pack(fill="both", expand=True, padx=10, pady=(0, 6))
 
         ctk.CTkButton(
             sidebar,
-            text="+ New project",
+            text="+  new project",
             font=FONT_UI,
-            fg_color=PANEL,
+            fg_color="transparent",
             hover_color=BORDER,
-            text_color=ACCENT,
+            text_color=MUTED,
+            anchor="w",
+            height=30,
             command=self._new_project_dialog,
-        ).pack(fill="x", padx=10, pady=(0, 12))
+        ).pack(fill="x", padx=10, pady=(0, 14))
+
+        # Vertical divider
+        ctk.CTkFrame(root, width=1, fg_color=DIVIDER, corner_radius=0).pack(
+            side="left", fill="y"
+        )
 
         # Center: terminal
         center = ctk.CTkFrame(root, fg_color=BG, corner_radius=0)
         center.pack(side="left", fill="both", expand=True)
 
-        header = ctk.CTkFrame(center, fg_color=PANEL, height=40, corner_radius=0)
+        header = ctk.CTkFrame(center, fg_color=BG, height=44, corner_radius=0)
         header.pack(fill="x")
         header.pack_propagate(False)
         self._header_label = ctk.CTkLabel(
             header,
-            text="cad-llm  ·  select a project",
+            text="select a project to begin",
             font=FONT_UI,
             text_color=MUTED,
             anchor="w",
         )
-        self._header_label.pack(fill="both", padx=14, pady=8)
+        self._header_label.pack(side="left", fill="both", padx=20, pady=10)
 
-        self._transcript = TerminalText(center, corner_radius=0)
-        self._transcript.pack(fill="both", expand=True, padx=0, pady=0)
+        ctk.CTkFrame(center, height=1, fg_color=DIVIDER, corner_radius=0).pack(fill="x")
 
-        input_row = ctk.CTkFrame(center, fg_color=PANEL, corner_radius=0)
-        input_row.pack(fill="x")
-        self._prompt = ctk.CTkEntry(
+        transcript_wrap = ctk.CTkFrame(center, fg_color=BG, corner_radius=0)
+        transcript_wrap.pack(fill="both", expand=True)
+        self._transcript = TerminalText(transcript_wrap, corner_radius=0)
+        self._transcript.pack(fill="both", expand=True, padx=12, pady=(8, 8))
+
+        ctk.CTkFrame(center, height=1, fg_color=DIVIDER, corner_radius=0).pack(fill="x")
+
+        input_row = ctk.CTkFrame(center, fg_color=BG, corner_radius=0)
+        input_row.pack(fill="x", padx=12, pady=12)
+
+        prompt_box = ctk.CTkFrame(
             input_row,
-            placeholder_text="you ›",
-            font=FONT_MONO,
-            fg_color=BG,
+            fg_color=SURFACE,
+            corner_radius=8,
+            border_width=1,
             border_color=BORDER,
-            text_color=TEXT,
         )
-        self._prompt.pack(side="left", fill="x", expand=True, padx=(12, 8), pady=10)
+        prompt_box.pack(fill="x")
+
+        ctk.CTkLabel(
+            prompt_box,
+            text="›",
+            font=FONT_MONO,
+            text_color=ACCENT,
+            width=24,
+        ).pack(side="left", padx=(10, 0), pady=8)
+
+        self._prompt = ctk.CTkEntry(
+            prompt_box,
+            placeholder_text="ask cad-llm…",
+            font=FONT_MONO,
+            fg_color=SURFACE,
+            border_width=0,
+            text_color=TEXT,
+            placeholder_text_color=SUBTLE,
+        )
+        self._prompt.pack(side="left", fill="x", expand=True, padx=(4, 8), pady=8)
         self._prompt.bind("<Return>", self._on_submit)
+
         self._send_btn = ctk.CTkButton(
-            input_row,
-            text="Send",
-            width=72,
-            fg_color=ACCENT,
-            hover_color="#2eb8aa",
-            text_color=BG,
+            prompt_box,
+            text="send  ⏎",
+            width=80,
+            height=28,
+            corner_radius=6,
+            fg_color=BORDER,
+            hover_color=SUBTLE,
+            text_color=TEXT,
+            font=FONT_LABEL,
             command=self._on_submit,
         )
-        self._send_btn.pack(side="right", padx=(0, 12), pady=10)
+        self._send_btn.pack(side="right", padx=8, pady=8)
+
+        # Vertical divider before viewer
+        ctk.CTkFrame(root, width=1, fg_color=DIVIDER, corner_radius=0).pack(
+            side="right", fill="y"
+        )
 
         # Right: CAD viewer
         self._viewer = CadViewerPanel(root)
@@ -225,7 +283,7 @@ class CadDesktopApp(ctk.CTk):
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
             name = meta.get("name") or project.project_id
         self._header_label.configure(
-            text=f"cad-llm  ·  {name}  ·  {project.project_id}",
+            text=f"{name}   ·   {project.project_id}",
             text_color=TEXT,
         )
         self._transcript.configure(state="normal")

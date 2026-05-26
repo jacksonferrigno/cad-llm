@@ -1,17 +1,21 @@
-"""Dark terminal-style palette for the desktop shell."""
+"""Codex/Claude-Code-inspired palette for the desktop shell."""
 
-BG = "#0c0c0e"
-PANEL = "#121216"
+BG = "#0d0d0f"
+PANEL = "#131316"
 SIDEBAR = "#0f0f12"
-BORDER = "#252530"
-TEXT = "#e6e6ea"
-MUTED = "#6b6b78"
-ACCENT = "#3dd6c6"
-ACCENT_DIM = "#2a9d90"
-USER = "#f0f0f5"
-AGENT = "#b8c0cc"
-ERROR = "#ff6b6b"
-OK = "#5dffa8"
-FONT_MONO = ("Menlo", 12)
-FONT_UI = ("SF Pro Text", 13)
-FONT_TITLE = ("SF Pro Display", 11, "bold")
+SURFACE = "#16161a"
+BORDER = "#1f1f24"
+DIVIDER = "#1a1a1f"
+TEXT = "#e8e6e1"
+MUTED = "#7a7a82"
+SUBTLE = "#4a4a52"
+ACCENT = "#d4a056"
+ACCENT_DIM = "#8a6a3a"
+USER = "#f2efe8"
+AGENT = "#b8b4ab"
+ERROR = "#e06b6b"
+OK = "#7fc28a"
+FONT_MONO = ("JetBrains Mono", 12)
+FONT_UI = ("SF Pro Text", 12)
+FONT_LABEL = ("SF Pro Text", 11)
+FONT_TITLE = ("SF Pro Text", 12, "normal")

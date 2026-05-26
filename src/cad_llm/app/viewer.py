@@ -15,68 +15,64 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from cad_llm.app import theme
 from cad_llm.app.mesh import load_trimesh
 
-_MESH_BASE = (0.55, 0.62, 0.70)
-_GRID = "#3a3a48"
-_CARD = "#16161c"
-_CARD_BORDER = "#22222c"
+_MESH_BASE = (0.62, 0.60, 0.55)
+_GRID = "#2a2a30"
+_CARD = "#111114"
+_CARD_BORDER = "#1f1f24"
 
 
 class CadViewerPanel(ctk.CTkFrame):
     def __init__(self, master: Any, **kwargs: Any) -> None:
-        super().__init__(master, fg_color=theme.PANEL, corner_radius=0, width=400, **kwargs)
+        super().__init__(master, fg_color=theme.BG, corner_radius=0, width=420, **kwargs)
         self.pack_propagate(False)
 
         self._view_center: np.ndarray | None = None
         self._view_half: float = 1.0
 
-        header = ctk.CTkFrame(self, fg_color=theme.PANEL, corner_radius=0, height=32)
-        header.pack(fill="x", padx=16, pady=(14, 0))
+        header = ctk.CTkFrame(self, fg_color=theme.BG, corner_radius=0, height=44)
+        header.pack(fill="x", padx=20, pady=0)
         header.pack_propagate(False)
 
-        title_wrap = ctk.CTkFrame(header, fg_color="transparent")
-        title_wrap.pack(side="left")
         ctk.CTkLabel(
-            title_wrap,
-            text="●",
-            font=("SF Pro Display", 11),
-            text_color=theme.ACCENT,
-        ).pack(side="left", padx=(0, 6))
-        ctk.CTkLabel(
-            title_wrap,
-            text="CAD PREVIEW",
-            font=theme.FONT_TITLE,
+            header,
+            text="preview",
+            font=theme.FONT_UI,
             text_color=theme.TEXT,
             anchor="w",
-        ).pack(side="left")
+        ).pack(side="left", pady=10)
 
         self._filename = ctk.CTkLabel(
             header,
             text="",
-            font=theme.FONT_UI,
+            font=theme.FONT_LABEL,
             text_color=theme.MUTED,
             anchor="e",
         )
-        self._filename.pack(side="right", fill="x", expand=True)
+        self._filename.pack(side="right", fill="x", expand=True, pady=10)
 
-        ctk.CTkLabel(
-            self,
-            text="drag to orbit   ·   scroll to zoom",
-            font=theme.FONT_UI,
-            text_color=theme.MUTED,
-            anchor="w",
-        ).pack(fill="x", padx=16, pady=(4, 10))
+        ctk.CTkFrame(self, height=1, fg_color=theme.DIVIDER, corner_radius=0).pack(
+            fill="x"
+        )
 
         card = ctk.CTkFrame(
             self,
             fg_color=_CARD,
-            corner_radius=10,
+            corner_radius=8,
             border_width=1,
             border_color=_CARD_BORDER,
         )
-        card.pack(fill="both", expand=True, padx=16, pady=(0, 16))
+        card.pack(fill="both", expand=True, padx=16, pady=(16, 6))
 
         self._plot_host = tk.Frame(card, bg=_CARD, highlightthickness=0)
-        self._plot_host.pack(fill="both", expand=True, padx=8, pady=8)
+        self._plot_host.pack(fill="both", expand=True, padx=6, pady=6)
+
+        ctk.CTkLabel(
+            self,
+            text="drag to orbit   ·   scroll to zoom",
+            font=theme.FONT_LABEL,
+            text_color=theme.SUBTLE,
+            anchor="w",
+        ).pack(fill="x", padx=20, pady=(0, 14))
 
         self._figure = Figure(figsize=(4.5, 4.5), facecolor=_CARD)
         self._figure.subplots_adjust(left=0, right=1, bottom=0, top=1)

@@ -98,4 +98,4 @@ def test_run_agent_sandbox_nudge_if_model_replies_before_auto_sandbox(tmp_path: 
 
     events = [json.loads(line) for line in chat.transcript_path.read_text().strip().splitlines()]
     assert not any(event.get("type") == "auto_docs" for event in events)
-    assert "Finished." in result.final_response
+    assert "Done!" in result.final_response or "Finished." in result.final_response

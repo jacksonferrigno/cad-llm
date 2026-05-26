@@ -12,6 +12,7 @@ class AgentStep:
     content: str
     tool_name: str | None = None
     tool_args: dict[str, Any] | None = None
+    phase: str | None = None
 
 
 @dataclass

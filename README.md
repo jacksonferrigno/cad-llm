@@ -4,6 +4,8 @@ Fine-tune a 4B coder model on Apple Silicon to generate CadQuery/build123d from 
 
 See [overview.md](overview.md) for the full roadmap.
 
+See [docs/AGENT.md](docs/AGENT.md) for how the CAD agent works.
+
 ## Requirements
 
 - Apple Silicon Mac (MLX training/inference)
